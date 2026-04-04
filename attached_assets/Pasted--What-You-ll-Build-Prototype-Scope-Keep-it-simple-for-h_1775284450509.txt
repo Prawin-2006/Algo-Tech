@@ -1,0 +1,93 @@
+🚀 What You’ll Build (Prototype Scope)
+👉 Keep it simple for hackathon:
+Patient registration
+Upload/view records
+QR-based access
+Chatbot to fetch info
+Emergency + full access mode
+🧠 1. MAIN PROMPT (Paste this first in Replit AI)
+Writing
+Build a healthcare record management prototype using Python FastAPI for backend.
+Features:
+User registration (patient & doctor roles)
+Upload patient medical data (store as JSON)
+Encrypt data using AES before storing
+Store encrypted data locally (simulate IPFS)
+Generate SHA-256 hash of data (simulate blockchain storage)
+QR code generation for patient ID
+API to retrieve patient data using QR code
+Role-based access:
+Emergency: show only critical fields (allergies, blood group, diseases)
+Full access: show complete record (only for authenticated doctors)
+Chatbot endpoint:
+Accept user query
+Search patient data using keyword matching
+Return relevant info (e.g., allergies, conditions)
+Emergency override:
+Allow doctor to access full data
+Log reason and timestamp
+Use FastAPI, pydantic models, and keep the code simple and modular.
+⚙️ 2. FRONTEND PROMPT (Simple UI)
+Writing
+Create a simple frontend using HTML, CSS, and JavaScript.
+Features:
+Form for patient registration
+Upload medical data (JSON format)
+Button to generate QR code
+Scan/input patient ID to fetch data
+Display:
+Emergency data view
+Full data view (after login)
+Chatbot input box:
+User types query
+Shows response from backend
+Keep UI clean and minimal for demo.
+🤖 3. CHATBOT LOGIC PROMPT
+Writing
+Implement a simple chatbot function in Python.
+Requirements:
+Accept a query string
+Use keyword matching:
+"allergy" → return allergy data
+"blood" → return blood group
+"disease" → return diseases
+"medicine" → return prescriptions
+If no match → return "No relevant data found"
+Use simple if-else or dictionary-based mapping
+Keep it lightweight (no heavy ML).
+🔐 4. ENCRYPTION + HASH PROMPT
+Writing
+Add security features to FastAPI backend:
+AES encryption:
+Encrypt patient data before storing
+Decrypt when retrieving
+SHA-256 hashing:
+Generate hash of original data
+Store hash separately (simulate blockchain)
+Verify hash when retrieving data to ensure integrity
+Use Python libraries like hashlib and cryptography.
+🚑 5. EMERGENCY MODE PROMPT
+Writing
+Implement emergency access logic:
+When emergency mode is triggered:
+Return only critical patient data: allergies, blood group, diseases
+When full access:
+Require doctor authentication
+Add emergency override:
+Allow full access without patient approval
+Log doctor ID, reason, and timestamp
+Keep it simple and easy to demonstrate.
+💥 6. DEMO FLOW (VERY IMPORTANT)
+When you present:
+Register patient
+Upload data
+Generate QR
+Simulate scan → show emergency info
+Login as doctor → show full data
+Ask chatbot → “Any allergies?”
+👉 Judges LOVE this flow
+⚠️ Important Tips (Don’t skip)
+Don’t try real blockchain → just simulate hash
+Don’t overbuild UI → focus on functionality
+Use JSON instead of database (faster)
+Keep everything working > fancy

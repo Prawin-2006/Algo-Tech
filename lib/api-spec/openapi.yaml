@@ -3,13 +3,24 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: HealthChain - Secure Medical Records API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: patients
+    description: Patient management
+  - name: records
+    description: Medical records
+  - name: access
+    description: Access control and emergency
+  - name: chatbot
+    description: AI chatbot queries
+  - name: audit
+    description: Audit logs
+
 paths:
   /healthz:
     get:
@@ -24,6 +35,294 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /patients/register:
+    post:
+      operationId: registerPatient
+      tags: [patients]
+      summary: Register a new patient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterPatientBody"
+      responses:
+        "201":
+          description: Patient registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Patient already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /patients:
+    get:
+      operationId: listPatients
+      tags: [patients]
+      summary: List all patients (doctor only)
+      responses:
+        "200":
+          description: List of patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Patient"
+
+  /patients/{patientId}:
+    get:
+      operationId: getPatient
+      tags: [patients]
+      summary: Get patient details
+      parameters:
+        - in: path
+          name: patientId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Patient details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "404":
+          description: Patient not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /patients/{patientId}/qr:
+    get:
+      operationId: getPatientQr
+      tags: [patients]
+      summary: Get QR code for patient
+      parameters:
+        - in: path
+          name: patientId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: QR code data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrCodeResponse"
+        "404":
+          description: Patient not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /patients/{patientId}/records:
+    get:
+      operationId: getPatientRecords
+      tags: [records]
+      summary: Get all medical records for a patient
+      parameters:
+        - in: path
+          name: patientId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of medical records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MedicalRecord"
+        "404":
+          description: Patient not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: uploadMedicalRecord
+      tags: [records]
+      summary: Upload a medical record for patient
+      parameters:
+        - in: path
+          name: patientId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadRecordBody"
+      responses:
+        "201":
+          description: Record uploaded and encrypted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicalRecord"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /patients/{patientId}/emergency:
+    get:
+      operationId: getEmergencyData
+      tags: [access]
+      summary: Get emergency critical data for patient (no auth required)
+      parameters:
+        - in: path
+          name: patientId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Emergency critical data only
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmergencyData"
+        "404":
+          description: Patient not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /patients/{patientId}/full-access:
+    post:
+      operationId: requestFullAccess
+      tags: [access]
+      summary: Doctor requests full access (with override log)
+      parameters:
+        - in: path
+          name: patientId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FullAccessRequestBody"
+      responses:
+        "200":
+          description: Full patient record returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FullPatientData"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Patient not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /doctors/login:
+    post:
+      operationId: doctorLogin
+      tags: [access]
+      summary: Doctor login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DoctorLoginBody"
+      responses:
+        "200":
+          description: Doctor authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorLoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /chatbot:
+    post:
+      operationId: chatbotQuery
+      tags: [chatbot]
+      summary: Query chatbot with patient context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatbotQueryBody"
+      responses:
+        "200":
+          description: Chatbot response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatbotResponse"
+
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [audit]
+      summary: List all audit logs (doctor only)
+      responses:
+        "200":
+          description: List of audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLog"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [patients]
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: System statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +333,305 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    RegisterPatientBody:
+      type: object
+      properties:
+        name:
+          type: string
+        age:
+          type: integer
+        gender:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        bloodGroup:
+          type: string
+        allergies:
+          type: array
+          items:
+            type: string
+        diseases:
+          type: array
+          items:
+            type: string
+        emergencyContact:
+          type: string
+      required:
+        - name
+        - age
+        - gender
+        - bloodGroup
+
+    Patient:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        age:
+          type: integer
+        gender:
+          type: string
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        bloodGroup:
+          type: string
+        allergies:
+          type: array
+          items:
+            type: string
+        diseases:
+          type: array
+          items:
+            type: string
+        emergencyContact:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - age
+        - gender
+        - bloodGroup
+        - allergies
+        - diseases
+        - createdAt
+
+    QrCodeResponse:
+      type: object
+      properties:
+        patientId:
+          type: string
+        qrDataUrl:
+          type: string
+        qrText:
+          type: string
+      required:
+        - patientId
+        - qrDataUrl
+        - qrText
+
+    UploadRecordBody:
+      type: object
+      properties:
+        recordType:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        prescriptions:
+          type: array
+          items:
+            type: string
+        labResults:
+          type: object
+          additionalProperties: true
+        doctorName:
+          type: string
+        hospitalName:
+          type: string
+        visitDate:
+          type: string
+      required:
+        - recordType
+        - title
+
+    MedicalRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        recordType:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        prescriptions:
+          type: array
+          items:
+            type: string
+        doctorName:
+          type: ["string", "null"]
+        hospitalName:
+          type: ["string", "null"]
+        visitDate:
+          type: ["string", "null"]
+        dataHash:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - patientId
+        - recordType
+        - title
+        - prescriptions
+        - dataHash
+        - createdAt
+
+    EmergencyData:
+      type: object
+      properties:
+        patientId:
+          type: string
+        name:
+          type: string
+        bloodGroup:
+          type: string
+        allergies:
+          type: array
+          items:
+            type: string
+        diseases:
+          type: array
+          items:
+            type: string
+        emergencyContact:
+          type: ["string", "null"]
+      required:
+        - patientId
+        - name
+        - bloodGroup
+        - allergies
+        - diseases
+
+    FullAccessRequestBody:
+      type: object
+      properties:
+        doctorId:
+          type: string
+        doctorName:
+          type: string
+        reason:
+          type: string
+        isEmergencyOverride:
+          type: boolean
+      required:
+        - doctorId
+        - doctorName
+        - reason
+
+    FullPatientData:
+      type: object
+      properties:
+        patient:
+          $ref: "#/components/schemas/Patient"
+        records:
+          type: array
+          items:
+            $ref: "#/components/schemas/MedicalRecord"
+        accessGrantedAt:
+          type: string
+      required:
+        - patient
+        - records
+        - accessGrantedAt
+
+    DoctorLoginBody:
+      type: object
+      properties:
+        doctorId:
+          type: string
+        password:
+          type: string
+      required:
+        - doctorId
+        - password
+
+    DoctorLoginResponse:
+      type: object
+      properties:
+        doctorId:
+          type: string
+        name:
+          type: string
+        authenticated:
+          type: boolean
+      required:
+        - doctorId
+        - name
+        - authenticated
+
+    ChatbotQueryBody:
+      type: object
+      properties:
+        query:
+          type: string
+        patientId:
+          type: ["string", "null"]
+      required:
+        - query
+
+    ChatbotResponse:
+      type: object
+      properties:
+        response:
+          type: string
+        matchedField:
+          type: ["string", "null"]
+      required:
+        - response
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+        patientId:
+          type: string
+        patientName:
+          type: string
+        doctorId:
+          type: string
+        doctorName:
+          type: string
+        reason:
+          type: string
+        isEmergencyOverride:
+          type: boolean
+        accessedAt:
+          type: string
+      required:
+        - id
+        - patientId
+        - patientName
+        - doctorId
+        - doctorName
+        - reason
+        - isEmergencyOverride
+        - accessedAt
+
+    StatsResponse:
+      type: object
+      properties:
+        totalPatients:
+          type: integer
+        totalRecords:
+          type: integer
+        totalAuditLogs:
+          type: integer
+        recentAccessCount:
+          type: integer
+      required:
+        - totalPatients
+        - totalRecords
+        - totalAuditLogs
+        - recentAccessCount
