@@ -6,6 +6,7 @@ import {
   MessageSquare,
   ClipboardList,
   UserPlus,
+  FolderSearch,
   LogIn,
   LogOut,
   ShieldCheck,
@@ -15,7 +16,14 @@ import {
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-const navLinks = [
+const doctorNavLinks = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/patients", label: "Patients", icon: Users },
+  { href: "/view-record", label: "View Record", icon: FolderSearch },
+  { href: "/chatbot", label: "Chatbot", icon: MessageSquare },
+  { href: "/audit", label: "Audit Logs", icon: ClipboardList },
+];
+const patientNavLinks = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/patients", label: "Patients", icon: Users },
   { href: "/register", label: "Register Patient", icon: UserPlus },
@@ -25,11 +33,12 @@ const navLinks = [
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { doctorId, name, logout } = useAuthStore();
+  const { doctorId, patientId, role, name, logout } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isEmergencyPage = location.startsWith("/emergency/");
   const isAuthPage = location === "/auth";
+  const navLinks = role === "doctor" ? doctorNavLinks : patientNavLinks;
 
   if (isEmergencyPage || isAuthPage) {
     return <>{children}</>;
@@ -73,11 +82,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="p-4 border-t border-border">
-          {doctorId ? (
+          {role ? (
             <div className="space-y-2">
               <div className="px-3 py-2 rounded-md bg-primary/10 border border-primary/20">
                 <p className="text-xs text-muted-foreground">Logged in as</p>
                 <p className="text-sm font-medium text-primary truncate">{name}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {role === "doctor" ? `Doctor ID: ${doctorId}` : `Patient ID: ${patientId}`}
+                </p>
               </div>
               <button
                 onClick={logout}
@@ -122,7 +134,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="flex-1" />
-          {doctorId && (
+          {role && (
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 text-xs text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded-full">
                 <ShieldCheck className="w-3 h-3" />

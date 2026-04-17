@@ -1,0 +1,100 @@
+
+> @workspace/api-server@0.0.0 start
+> node --env-file=.env --enable-source-maps ./dist/index.mjs
+
+[00:19:11.941] [32mINFO[39m (36056): [36mServer listening[39m
+    [35mport[39m: 3000
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+[00:19:14.485] [32mINFO[39m (36056): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "GET",
+      "url": "/api/patients/HC-X3HI2P29/records"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 496
+Gemini summary error: _ApiError: {"error":{"code":404,"message":"models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.","status":"NOT_FOUND"}}
+    at throwErrorIfNotOK (D:\Project\Hackathon\Algo-Architects\node_modules\@google\genai\src\_api_client.ts:953:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async <anonymous> (D:\Project\Hackathon\Algo-Architects\node_modules\@google\genai\src\_api_client.ts:561:9)
+    at async Models.Models.generateContent (D:\Project\Hackathon\Algo-Architects\node_modules\@google\genai\src\models.ts:128:14)
+    at async <anonymous> (D:\Project\Hackathon\Algo-Architects\artifacts\api-server\src\routes\patients.ts:1630:18) {
+  status: 404
+}
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+[00:19:15.848] [32mINFO[39m (36056): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 2,
+      "method": "POST",
+      "url": "/api/records/summarize"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1258
+Snapshot extraction AI error: _ApiError: {"error":{"code":404,"message":"models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.","status":"NOT_FOUND"}}
+    at throwErrorIfNotOK (D:\Project\Hackathon\Algo-Architects\node_modules\@google\genai\src\_api_client.ts:953:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async <anonymous> (D:\Project\Hackathon\Algo-Architects\node_modules\@google\genai\src\_api_client.ts:561:9)
+    at async Models.Models.generateContent (D:\Project\Hackathon\Algo-Architects\node_modules\@google\genai\src\models.ts:128:14)
+    at async extractSnapshotFromRecordText (D:\Project\Hackathon\Algo-Architects\artifacts\api-server\src\routes\patients.ts:391:22)
+    at async buildSnapshotFromLabResults (D:\Project\Hackathon\Algo-Architects\artifacts\api-server\src\routes\patients.ts:542:24)
+    at async <anonymous> (D:\Project\Hackathon\Algo-Architects\artifacts\api-server\src\routes\patients.ts:1164:20) {
+  status: 404
+}
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+[00:19:17.276] [32mINFO[39m (36056): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 3,
+      "method": "POST",
+      "url": "/api/patients/HC-X3HI2P29/records/f490208d-74f7-492b-971b-db76c09c1987/update-snapshot"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1427
+[00:19:17.279] [32mINFO[39m (36056): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 4,
+      "method": "GET",
+      "url": "/api/patients/HC-X3HI2P29"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1
+[00:19:17.487] [32mINFO[39m (36056): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 5,
+      "method": "GET",
+      "url": "/api/patients/HC-X3HI2P29/records"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 207
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+[00:19:55.691] [32mINFO[39m (36056): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 6,
+      "method": "GET",
+      "url": "/api/patients/HC-X3HI2P29/records"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 335

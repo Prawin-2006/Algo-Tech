@@ -10,6 +10,7 @@
     "scripts"
   ],
   "scripts": {
+    "dev": "npm run dev -w @workspace/api-server",
     "build": "npm run typecheck && npm --workspaces --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "npm run typecheck:libs && npm -w @workspace/api-server run typecheck && npm -w @workspace/mockup-sandbox run typecheck"
@@ -17,5 +18,10 @@
   "devDependencies": {
     "typescript": "~5.9.2",
     "prettier": "^3.8.1"
+  },
+  "overrides": {
+    "esbuild": "^0.25.0",
+    "@esbuild-kit/core-utils": "^3.3.2",
+    "@esbuild-kit/esm-loader": "^2.6.5"
   }
 }

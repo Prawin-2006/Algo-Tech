@@ -1,0 +1,80 @@
+{
+  "patients": [
+    {
+      "id": "HC-QQ9CZP1N",
+      "name": "Persist Final",
+      "age": 28,
+      "gender": "Female",
+      "phone": null,
+      "email": null,
+      "bloodGroup": "B+",
+      "allergies": [],
+      "diseases": [],
+      "emergencyContact": null,
+      "createdAt": "2026-04-17T13:50:13.712Z"
+    },
+    {
+      "id": "HC-VHJUMVQ8",
+      "name": "Persist Final 2",
+      "age": 30,
+      "gender": "Male",
+      "phone": null,
+      "email": null,
+      "bloodGroup": "A+",
+      "allergies": [],
+      "diseases": [],
+      "emergencyContact": null,
+      "createdAt": "2026-04-17T13:51:26.357Z"
+    }
+  ],
+  "records": [
+    {
+      "id": "758198d0-4849-48c3-8a02-a2d0736737ec",
+      "patientId": "HC-QQ9CZP1N",
+      "recordType": "document",
+      "title": "Patient Record: note.txt",
+      "description": "Soft-copy document uploaded during patient registration",
+      "prescriptions": [],
+      "labResults": {
+        "documentName": "note.txt",
+        "mimeType": "text/plain",
+        "sizeBytes": 24,
+        "contentBase64": "UGF0aWVudCBoYXMgZmV2ZXIu"
+      },
+      "doctorName": null,
+      "hospitalName": null,
+      "visitDate": "2026-04-17",
+      "encryptedData": "59f1ab089c26dc1f13b62908b7ef79a9:3babc56b2bf715dad9b6386265e7dba05a26f0d853354386e7603dbb731384e71c3deadf5b7c7bcfd9cce31e8d57b6c009071582038138d912fbf17805676947132169100090984b793c7f9c8db6c4854115de9bbb11fdddad3c86d7506c0cd2b9dc0e8ad25366b5a32e2431dd56207aa615f308a8a4ea9c77dc260054cc07f0e860fa66e4a0b1c7861159c928ab931c8e9d6b48b713a83f15d35c7fc107f414f5ca3c53e1116972616a4753e5a52795553fd9463f08487479101a93fdcb16de9711d17417adf6eff27f1ff08d6d2633a7fb91e571699e26ecf83ed10e1baba21d380d43ac4b1063755c1464f5b4f518818e69b10e0f0f9163a9e3f15f3e6762b4ac0889a3c033be981d0eacc9e38a4627b24e06a948caa7f78196bd4cd189d3f1d784a20978be60cb8c7993935889a6",
+      "dataHash": "263656bb9f0eeeb8015ec8b122401462f8b64c63b6638d78513c799e2eb4fc9a",
+      "createdAt": "2026-04-17T13:50:13.790Z"
+    }
+  ],
+  "audits": [],
+  "patientPasswords": [
+    [
+      "persist final",
+      "pass1"
+    ],
+    [
+      "persist final 2",
+      "pass2"
+    ]
+  ],
+  "primaryDoctors": [
+    [
+      "HC-QQ9CZP1N",
+      {
+        "doctorId": "doctor1",
+        "doctorName": "Dr. Priya Sharma"
+      }
+    ],
+    [
+      "HC-VHJUMVQ8",
+      {
+        "doctorId": "doctor1",
+        "doctorName": "Dr. Priya Sharma"
+      }
+    ]
+  ],
+  "accessRequests": []
+}

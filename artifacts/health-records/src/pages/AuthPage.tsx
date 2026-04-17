@@ -4,389 +4,695 @@ import { useDoctorLogin, useRegisterPatient } from "@workspace/api-client-react"
 import { useAuthStore } from "@/store/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ShieldCheck,
+  HeartPulse,
+  Stethoscope,
+  User,
   Eye,
   EyeOff,
-  UserPlus,
-  LogIn,
-  HeartPulse,
-  CheckCircle2,
-  Copy,
+  Lock,
+  IdCard,
+  UserRound,
 } from "lucide-react";
 
-type Tab = "signin" | "signup";
-
+type Mode = "signin" | "signup";
+type AccountType = "doctor" | "patient";
 type BloodGroup = "A+" | "A-" | "B+" | "B-" | "O+" | "O-" | "AB+" | "AB-";
 
 const bloodGroups: BloodGroup[] = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
+const LOCAL_PATIENT_CREDENTIALS_KEY = "healthchain-local-patient-credentials";
+
+type LocalPatientCredential = {
+  id: string;
+  name: string;
+  password: string;
+  age?: number;
+  gender?: string;
+  bloodGroup?: string;
+};
+
+function readLocalPatientCredentials(): LocalPatientCredential[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_PATIENT_CREDENTIALS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is LocalPatientCredential => {
+      if (!item || typeof item !== "object") return false;
+      const record = item as Record<string, unknown>;
+      return (
+        typeof record.id === "string" &&
+        typeof record.name === "string" &&
+        typeof record.password === "string"
+      );
+    });
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalPatientCredentials(data: LocalPatientCredential[]): void {
+  localStorage.setItem(LOCAL_PATIENT_CREDENTIALS_KEY, JSON.stringify(data));
+}
+
+function upsertLocalPatientCredential(entry: LocalPatientCredential): void {
+  const current = readLocalPatientCredentials();
+  const withoutSameName = current.filter(
+    (item) => item.name.toLowerCase() !== entry.name.toLowerCase(),
+  );
+  writeLocalPatientCredentials([...withoutSameName, entry]);
+}
+
+function findLocalPatientCredential(name: string, password: string): LocalPatientCredential | null {
+  const normalizedName = name.trim().toLowerCase();
+  return (
+    readLocalPatientCredentials().find(
+      (item) => item.name.toLowerCase() === normalizedName && item.password === password,
+    ) ?? null
+  );
+}
+
+function chooseAge(...values: Array<number | string | null | undefined>): number | undefined {
+  for (const value of values) {
+    const num = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(num) && num > 0) return num;
+  }
+  return undefined;
+}
+
+function chooseKnownText(
+  ...values: Array<string | null | undefined>
+): string | undefined {
+  for (const value of values) {
+    if (!value) continue;
+    const trimmed = value.trim();
+    if (trimmed && trimmed.toLowerCase() !== "unknown") return trimmed;
+  }
+  return undefined;
+}
+
+async function syncBackendPatientProfile(
+  patientId: string,
+  profile: { age?: number; gender?: string; bloodGroup?: string },
+): Promise<void> {
+  if (!profile.age && !profile.gender && !profile.bloodGroup) return;
+  await fetch(`/api/patients/${encodeURIComponent(patientId)}/profile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(profile),
+  });
+}
 
 export default function AuthPage() {
   const [, navigate] = useLocation();
-  const { login } = useAuthStore();
+  const { loginDoctor, loginPatient } = useAuthStore();
   const { toast } = useToast();
 
-  const [tab, setTab] = useState<Tab>("signin");
-  const [showPassword, setShowPassword] = useState(false);
-  const [newHealthId, setNewHealthId] = useState<string | null>(null);
-
-  const loginMutation = useDoctorLogin();
+  const doctorLoginMutation = useDoctorLogin();
   const registerMutation = useRegisterPatient();
 
-  const [signIn, setSignIn] = useState({ doctorId: "", password: "" });
-  const [signUp, setSignUp] = useState({
+  const [mode, setMode] = useState<Mode>("signin");
+  const [accountType, setAccountType] = useState<AccountType>("doctor");
+  const [showSecret, setShowSecret] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
+
+  const [doctorSignIn, setDoctorSignIn] = useState({ doctorId: "", doctorName: "" });
+  const [patientSignIn, setPatientSignIn] = useState({
+    patientName: "",
+    password: "",
+    age: "",
+    gender: "Unknown",
+    bloodGroup: "Unknown",
+  });
+
+  const [patientSignUp, setPatientSignUp] = useState({
     name: "",
+    password: "",
     age: "",
     gender: "Male",
     bloodGroup: "O+" as BloodGroup,
-    phone: "",
-    email: "",
-    allergies: "",
-    diseases: "",
     emergencyContact: "",
   });
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const isSigningIn =
+    doctorLoginMutation.isPending ||
+    registerMutation.isPending;
+
+  const handleDoctorSignIn = (e: React.FormEvent) => {
     e.preventDefault();
-    loginMutation.mutate(
-      { data: { doctorId: signIn.doctorId, password: signIn.password } },
+
+    doctorLoginMutation.mutate(
+      {
+        data: {
+          doctorId: doctorSignIn.doctorId,
+          password: doctorSignIn.doctorName,
+          name: doctorSignIn.doctorName,
+        } as any,
+      },
       {
         onSuccess: (data) => {
-          login(data.doctorId, data.name);
-          toast({ title: `Welcome back, ${data.name}!`, description: "You now have full access." });
-          navigate("/");
+          loginDoctor(data.doctorId, data.name);
+          toast({ title: `Welcome, ${data.name}` });
+          navigate("/view-record");
         },
         onError: () => {
           toast({
             title: "Invalid credentials",
-            description: "Check your Doctor ID and password.",
+            description: "Use Doctor ID and Doctor Name.",
             variant: "destructive",
           });
-        },
-      }
-    );
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    registerMutation.mutate(
-      {
-        data: {
-          name: signUp.name,
-          age: parseInt(signUp.age),
-          gender: signUp.gender,
-          bloodGroup: signUp.bloodGroup,
-          phone: signUp.phone || undefined,
-          email: signUp.email || undefined,
-          allergies: signUp.allergies ? signUp.allergies.split(",").map((s) => s.trim()).filter(Boolean) : [],
-          diseases: signUp.diseases ? signUp.diseases.split(",").map((s) => s.trim()).filter(Boolean) : [],
-          emergencyContact: signUp.emergencyContact || undefined,
         },
       },
-      {
-        onSuccess: (data) => {
-          setNewHealthId(data.id);
-        },
-        onError: () => {
-          toast({
-            title: "Registration failed",
-            description: "Please check your details and try again.",
-            variant: "destructive",
-          });
-        },
-      }
     );
   };
 
-  const copyHealthId = () => {
-    if (newHealthId) {
-      navigator.clipboard.writeText(newHealthId);
-      toast({ title: "Health ID copied!" });
+  const handlePatientSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const localEntry = findLocalPatientCredential(
+      patientSignIn.patientName,
+      patientSignIn.password,
+    );
+
+    try {
+      const res = await fetch("/api/patients/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patientSignIn),
+      });
+
+      const data = (await res.json()) as {
+        patientId?: string;
+        name?: string;
+        error?: string;
+      };
+
+      if (!res.ok || !data.patientId || !data.name) {
+        throw new Error(data.error || "Invalid patient credentials");
+      }
+
+      let mergedProfile: { age?: number; gender?: string; bloodGroup?: string } = {};
+      try {
+        const patientRes = await fetch(`/api/patients/${encodeURIComponent(data.patientId)}`);
+        if (patientRes.ok) {
+          const patientData = (await patientRes.json()) as {
+            age?: number;
+            gender?: string;
+            bloodGroup?: string;
+          };
+          mergedProfile = {
+            age: chooseAge(patientData.age, localEntry?.age, patientSignIn.age),
+            gender: chooseKnownText(
+              patientData.gender,
+              localEntry?.gender,
+              patientSignIn.gender,
+            ),
+            bloodGroup: chooseKnownText(
+              patientData.bloodGroup,
+              localEntry?.bloodGroup,
+              patientSignIn.bloodGroup,
+            ),
+          };
+          upsertLocalPatientCredential({
+            id: data.patientId,
+            name: data.name,
+            password: patientSignIn.password,
+            age: mergedProfile.age,
+            gender: mergedProfile.gender,
+            bloodGroup: mergedProfile.bloodGroup,
+          });
+        }
+      } catch {
+        // Continue login even if profile fetch fails.
+      }
+
+      if (!mergedProfile.age && !mergedProfile.gender && !mergedProfile.bloodGroup) {
+        mergedProfile = {
+          age: chooseAge(localEntry?.age, patientSignIn.age),
+          gender: chooseKnownText(localEntry?.gender, patientSignIn.gender),
+          bloodGroup: chooseKnownText(localEntry?.bloodGroup, patientSignIn.bloodGroup),
+        };
+      }
+
+      await syncBackendPatientProfile(data.patientId, mergedProfile);
+      loginPatient(data.patientId, data.name, mergedProfile);
+      toast({ title: `Welcome, ${data.name}` });
+      navigate(`/patients/${data.patientId}`);
+    } catch (error) {
+      const localMatch = localEntry;
+      if (localMatch) {
+        const mergedAge = chooseAge(localMatch.age, patientSignIn.age);
+        const mergedGender = chooseKnownText(localMatch.gender, patientSignIn.gender);
+        const mergedBloodGroup = chooseKnownText(localMatch.bloodGroup, patientSignIn.bloodGroup);
+
+        try {
+          const registerRes = await fetch("/api/patients/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: localMatch.name,
+              password: localMatch.password,
+              age: mergedAge ?? 0,
+              gender: mergedGender ?? "Unknown",
+              bloodGroup: mergedBloodGroup ?? "Unknown",
+              allergies: [],
+              diseases: [],
+            }),
+          });
+
+          if (registerRes.ok) {
+            const backendPatient = (await registerRes.json()) as { id: string; name: string };
+            upsertLocalPatientCredential({
+              ...localMatch,
+              id: backendPatient.id,
+            });
+            loginPatient(backendPatient.id, backendPatient.name, {
+              age: mergedAge,
+              gender: mergedGender,
+              bloodGroup: mergedBloodGroup,
+            });
+            toast({
+              title: `Welcome, ${backendPatient.name}`,
+              description: "Your local profile was synced to secure records.",
+            });
+            navigate(`/patients/${backendPatient.id}`);
+            return;
+          }
+        } catch {
+          // Ignore backend sync failure and continue local fallback.
+        }
+
+        upsertLocalPatientCredential({
+          ...localMatch,
+          age: mergedAge,
+          gender: mergedGender,
+          bloodGroup: mergedBloodGroup,
+        });
+
+        loginPatient(localMatch.id, localMatch.name, {
+          age: mergedAge,
+          gender: mergedGender,
+          bloodGroup: mergedBloodGroup,
+        });
+        toast({
+          title: `Welcome, ${localMatch.name}`,
+          description: "Using local profile data.",
+        });
+        navigate(`/patients/${localMatch.id}`);
+        return;
+      }
+
+      toast({
+        title: "Invalid credentials",
+        description: error instanceof Error ? error.message : "Use Patient Name and Password.",
+        variant: "destructive",
+      });
     }
   };
 
+  const handlePatientSignUp = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    registerMutation.mutate(
+      {
+        data: {
+          name: patientSignUp.name,
+          password: patientSignUp.password,
+          age: Number(patientSignUp.age),
+          gender: patientSignUp.gender,
+          bloodGroup: patientSignUp.bloodGroup,
+          emergencyContact: patientSignUp.emergencyContact || undefined,
+        } as any,
+      },
+      {
+        onSuccess: (data) => {
+          upsertLocalPatientCredential({
+            id: data.id,
+            name: patientSignUp.name,
+            password: patientSignUp.password,
+            age: Number(patientSignUp.age),
+            gender: patientSignUp.gender,
+            bloodGroup: patientSignUp.bloodGroup,
+          });
+          toast({ title: "Patient account created", description: `Health ID: ${data.id}` });
+          setPatientSignIn({
+            patientName: patientSignUp.name,
+            password: patientSignUp.password,
+            age: patientSignUp.age,
+            gender: patientSignUp.gender,
+            bloodGroup: patientSignUp.bloodGroup,
+          });
+          setAccountType("patient");
+          setMode("signin");
+        },
+        onError: () => {
+          const fallbackId = `LOCAL-${Date.now().toString(36).toUpperCase()}`;
+          upsertLocalPatientCredential({
+            id: fallbackId,
+            name: patientSignUp.name,
+            password: patientSignUp.password,
+            age: Number(patientSignUp.age),
+            gender: patientSignUp.gender,
+            bloodGroup: patientSignUp.bloodGroup,
+          });
+          toast({
+            title: "Created locally",
+            description: "Database unavailable. Patient credentials saved in this browser.",
+          });
+          setPatientSignIn({
+            patientName: patientSignUp.name,
+            password: patientSignUp.password,
+            age: patientSignUp.age,
+            gender: patientSignUp.gender,
+            bloodGroup: patientSignUp.bloodGroup,
+          });
+          setAccountType("patient");
+          setMode("signin");
+        },
+      },
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <HeartPulse className="w-8 h-8 text-primary-foreground" />
+    <div className="min-h-screen bg-slate-100 px-4 py-10">
+      <div className="mx-auto max-w-md">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-600 shadow-lg">
+            <HeartPulse className="h-7 w-7 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">HealthChain</h1>
-          <p className="text-sm text-muted-foreground mt-1">Secure Medical Records System</p>
+          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">MediLock</h1>
+          <p className="mt-1 text-sm text-slate-500">Secure Health Records Platform</p>
         </div>
 
-        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex border-b border-border">
+        <div className="mt-7 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex rounded-xl bg-slate-100 p-1">
             <button
-              onClick={() => { setTab("signin"); setNewHealthId(null); }}
-              className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-medium transition-colors ${
-                tab === "signin"
-                  ? "bg-primary/5 text-primary border-b-2 border-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              type="button"
+              onClick={() => setMode("signin")}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                mode === "signin" ? "bg-white text-slate-900 shadow" : "text-slate-600"
               }`}
             >
-              <LogIn className="w-4 h-4" />
               Sign In
             </button>
             <button
-              onClick={() => { setTab("signup"); setNewHealthId(null); }}
-              className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-medium transition-colors ${
-                tab === "signup"
-                  ? "bg-primary/5 text-primary border-b-2 border-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                setAccountType("patient");
+              }}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                mode === "signup" ? "bg-white text-slate-900 shadow" : "text-slate-600"
               }`}
             >
-              <UserPlus className="w-4 h-4" />
               Sign Up
             </button>
           </div>
 
-          <div className="p-6">
-            {tab === "signin" && (
-              <div className="space-y-5">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Welcome back</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Sign in with your doctor credentials</p>
-                </div>
+          <h2 className="text-3xl font-bold text-slate-900">
+            {mode === "signin" ? "Sign in to your account" : "Create your patient account"}
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {mode === "signin" ? "Select your account type to continue" : "Patient sign up requires name and password"}
+          </p>
 
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Doctor ID</label>
-                    <input
-                      type="text"
-                      value={signIn.doctorId}
-                      onChange={(e) => setSignIn((s) => ({ ...s, doctorId: e.target.value }))}
-                      className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                      placeholder="e.g. doctor1"
-                      required
-                    />
+          {mode === "signin" && (
+            <>
+              <p className="mb-2 mt-6 text-sm font-semibold text-slate-700">I am a</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAccountType("doctor")}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    accountType === "doctor"
+                      ? "border-sky-500 bg-sky-50"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                    <Stethoscope className="h-5 w-5 text-slate-600" />
                   </div>
+                  <p className="text-base font-semibold text-slate-900">Doctor</p>
+                  <p className="text-xs text-slate-500">Healthcare Provider</p>
+                </button>
 
+                <button
+                  type="button"
+                  onClick={() => setAccountType("patient")}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    accountType === "patient"
+                      ? "border-sky-500 bg-sky-50"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                    <User className="h-5 w-5 text-slate-600" />
+                  </div>
+                  <p className="text-base font-semibold text-slate-900">Patient</p>
+                  <p className="text-xs text-slate-500">Personal Health</p>
+                </button>
+              </div>
+
+              {accountType === "doctor" ? (
+                <form onSubmit={handleDoctorSignIn} className="mt-5 space-y-4">
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Password</label>
+                    <label className="mb-1 block text-sm font-semibold text-slate-800">Doctor ID</label>
                     <div className="relative">
+                      <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                       <input
-                        type={showPassword ? "text" : "password"}
-                        value={signIn.password}
-                        onChange={(e) => setSignIn((s) => ({ ...s, password: e.target.value }))}
-                        className="w-full px-3 py-2.5 pr-10 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        placeholder="Enter password"
+                        type="text"
                         required
+                        value={doctorSignIn.doctorId}
+                        onChange={(e) => setDoctorSignIn((s) => ({ ...s, doctorId: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                        placeholder="doctor1"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
                     </div>
                   </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-800">Doctor Name</label>
+                    <div className="relative">
+                      <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        required
+                        value={doctorSignIn.doctorName}
+                        onChange={(e) => setDoctorSignIn((s) => ({ ...s, doctorName: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                        placeholder="Dr. Priya Sharma"
+                      />
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={rememberDevice}
+                      onChange={(e) => setRememberDevice(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300"
+                    />
+                    Remember this device
+                  </label>
 
                   <button
                     type="submit"
-                    disabled={loginMutation.isPending}
-                    className="w-full py-2.5 px-4 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-60"
+                    disabled={isSigningIn}
+                    className="w-full rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"
                   >
-                    {loginMutation.isPending ? "Signing in..." : "Sign In"}
+                    {isSigningIn ? "Signing in..." : "Sign In as Doctor"}
                   </button>
                 </form>
-
-                <div className="pt-1">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Demo accounts</p>
-                  <div className="grid gap-1.5">
-                    {[
-                      { id: "doctor1", name: "Dr. Priya Sharma" },
-                      { id: "doctor2", name: "Dr. Rajesh Kumar" },
-                      { id: "doctor3", name: "Dr. Anitha Nair" },
-                    ].map(({ id, name }) => (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => setSignIn({ doctorId: id, password: "health123" })}
-                        className="flex items-center gap-3 p-2.5 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition-all text-left"
-                      >
-                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-foreground">{name}</p>
-                          <p className="text-xs text-muted-foreground">{id} · health123</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {tab === "signup" && !newHealthId && (
-              <div className="space-y-5">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Create patient account</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Register to get your secure Health ID</p>
-                </div>
-
-                <form onSubmit={handleSignUp} className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Full Name *</label>
+              ) : (
+                <form onSubmit={handlePatientSignIn} className="mt-5 space-y-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-800">Patient Name</label>
+                    <div className="relative">
+                      <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                       <input
                         type="text"
-                        value={signUp.name}
-                        onChange={(e) => setSignUp((s) => ({ ...s, name: e.target.value }))}
-                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        placeholder="Your full name"
                         required
+                        value={patientSignIn.patientName}
+                        onChange={(e) => setPatientSignIn((s) => ({ ...s, patientName: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                        placeholder="Patient full name"
                       />
                     </div>
+                  </div>
 
+                  <div>
+                    <div className="mb-1 flex items-center justify-between">
+                      <label className="block text-sm font-semibold text-slate-800">Password</label>
+                    </div>
+                    <div className="relative">
+                      <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type={showSecret ? "text" : "password"}
+                        required
+                        value={patientSignIn.password}
+                        onChange={(e) => setPatientSignIn((s) => ({ ...s, password: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-10 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                        placeholder="Password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSecret((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+                      >
+                        {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Age *</label>
+                      <label className="mb-1 block text-xs font-semibold text-slate-700">Age</label>
                       <input
                         type="number"
                         min="1"
                         max="120"
-                        value={signUp.age}
-                        onChange={(e) => setSignUp((s) => ({ ...s, age: e.target.value }))}
-                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        placeholder="Age"
-                        required
+                        value={patientSignIn.age}
+                        onChange={(e) => setPatientSignIn((s) => ({ ...s, age: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                        placeholder="Optional"
                       />
                     </div>
-
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Gender *</label>
+                      <label className="mb-1 block text-xs font-semibold text-slate-700">Gender</label>
                       <select
-                        value={signUp.gender}
-                        onChange={(e) => setSignUp((s) => ({ ...s, gender: e.target.value }))}
-                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        value={patientSignIn.gender}
+                        onChange={(e) => setPatientSignIn((s) => ({ ...s, gender: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
                       >
+                        <option>Unknown</option>
                         <option>Male</option>
                         <option>Female</option>
                         <option>Other</option>
                       </select>
                     </div>
-
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Blood Group *</label>
+                      <label className="mb-1 block text-xs font-semibold text-slate-700">Blood Group</label>
                       <select
-                        value={signUp.bloodGroup}
-                        onChange={(e) => setSignUp((s) => ({ ...s, bloodGroup: e.target.value as BloodGroup }))}
-                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        value={patientSignIn.bloodGroup}
+                        onChange={(e) => setPatientSignIn((s) => ({ ...s, bloodGroup: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
                       >
+                        <option>Unknown</option>
                         {bloodGroups.map((bg) => (
                           <option key={bg}>{bg}</option>
                         ))}
                       </select>
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Phone</label>
-                      <input
-                        type="tel"
-                        value={signUp.phone}
-                        onChange={(e) => setSignUp((s) => ({ ...s, phone: e.target.value }))}
-                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        placeholder="+91 xxxxxxxxxx"
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Email</label>
-                      <input
-                        type="email"
-                        value={signUp.email}
-                        onChange={(e) => setSignUp((s) => ({ ...s, email: e.target.value }))}
-                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        placeholder="your@email.com"
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                        Known Allergies
-                        <span className="font-normal ml-1">(comma-separated)</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={signUp.allergies}
-                        onChange={(e) => setSignUp((s) => ({ ...s, allergies: e.target.value }))}
-                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        placeholder="e.g. Penicillin, Dust mites"
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Emergency Contact</label>
-                      <input
-                        type="text"
-                        value={signUp.emergencyContact}
-                        onChange={(e) => setSignUp((s) => ({ ...s, emergencyContact: e.target.value }))}
-                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        placeholder="+91 xxxxxxxxxx"
-                      />
-                    </div>
                   </div>
 
                   <button
                     type="submit"
-                    disabled={registerMutation.isPending}
-                    className="w-full py-2.5 px-4 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-60 mt-1"
+                    disabled={isSigningIn}
+                    className="w-full rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"
                   >
-                    {registerMutation.isPending ? "Creating account..." : "Create Account"}
+                    Sign In as Patient
                   </button>
                 </form>
-              </div>
-            )}
+              )}
+            </>
+          )}
 
-            {tab === "signup" && newHealthId && (
-              <div className="space-y-5 text-center">
-                <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
+          {mode === "signup" && (
+            <form onSubmit={handlePatientSignUp} className="mt-6 space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-800">Patient Name</label>
+                <input
+                  type="text"
+                  required
+                  value={patientSignUp.name}
+                  onChange={(e) => setPatientSignUp((s) => ({ ...s, name: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                  placeholder="Full name"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-800">Password</label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type={showSecret ? "text" : "password"}
+                    required
+                    value={patientSignUp.password}
+                    onChange={(e) => setPatientSignUp((s) => ({ ...s, password: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-10 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                    placeholder="Create a password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecret((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+                  >
+                    {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-800">Age</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    required
+                    value={patientSignUp.age}
+                    onChange={(e) => setPatientSignUp((s) => ({ ...s, age: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                  />
                 </div>
                 <div>
-                  <h2 className="text-base font-semibold text-foreground">Account created!</h2>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Your secure Health ID has been generated. Save it — you'll need it for emergency access.
-                  </p>
-                </div>
-
-                <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
-                  <p className="text-xs text-muted-foreground mb-1.5">Your Health ID</p>
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-xl font-bold text-primary tracking-widest font-mono">{newHealthId}</span>
-                    <button
-                      onClick={copyHealthId}
-                      className="p-1.5 rounded-md hover:bg-primary/10 text-primary transition-colors"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid gap-2">
-                  <button
-                    onClick={() => navigate(`/patients/${newHealthId}`)}
-                    className="w-full py-2.5 px-4 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:opacity-90 transition-opacity"
+                  <label className="mb-1 block text-sm font-semibold text-slate-800">Gender</label>
+                  <select
+                    value={patientSignUp.gender}
+                    onChange={(e) => setPatientSignUp((s) => ({ ...s, gender: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
                   >
-                    View My Profile
-                  </button>
-                  <button
-                    onClick={() => navigate("/")}
-                    className="w-full py-2.5 px-4 border border-border rounded-lg font-medium text-sm hover:bg-muted transition-colors text-muted-foreground"
-                  >
-                    Go to Dashboard
-                  </button>
+                    <option>Male</option>
+                    <option>Female</option>
+                    <option>Other</option>
+                  </select>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          All data is AES-256 encrypted · SHA-256 blockchain verified
-        </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-800">Blood Group</label>
+                  <select
+                    value={patientSignUp.bloodGroup}
+                    onChange={(e) => setPatientSignUp((s) => ({ ...s, bloodGroup: e.target.value as BloodGroup }))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                  >
+                    {bloodGroups.map((bg) => (
+                      <option key={bg}>{bg}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-800">Emergency Contact</label>
+                  <input
+                    type="text"
+                    value={patientSignUp.emergencyContact}
+                    onChange={(e) => setPatientSignUp((s) => ({ ...s, emergencyContact: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={registerMutation.isPending}
+                className="w-full rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"
+              >
+                {registerMutation.isPending ? "Creating account..." : "Sign Up as Patient"}
+              </button>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

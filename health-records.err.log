@@ -1,0 +1,265 @@
+[2m10:37:25 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+[2m10:37:26 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:38:17 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:38:17 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:38:18 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:38:18 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:25 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:25 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:27 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:27 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:32 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/records/doctor-view/HC-X3HI2P29?doctorId=doctor1[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:36 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/records/request-access[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:42 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/records/doctor-view/HC-X3HI2P29?doctorId=doctor1[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:44 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/records/request-access[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:52 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:52 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:53 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:39:53 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:40:04 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:40:04 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:40:05 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:40:05 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:44:31 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:44:32 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:44:43 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/records/request-access[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:44:45 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/records/doctor-view/HC-X3HI2P29?doctorId=doctor1[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:44:46 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/records/request-access[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:44:55 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:44:56 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:45:30 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/records/request-access[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:45:43 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/health[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:40 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+[2m10:47:40 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+[2m10:47:41 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:41 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:43 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/requests[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:45 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:46 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:46 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/audit-logs[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:47 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/audit-logs[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:48 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:49 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:52 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:53 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:56 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/records/request-access[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:58 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:58 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:47:59 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:00 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:00 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:01 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:02 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/qr[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:02 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:03 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/qr[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:03 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:06 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/emergency[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:07 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/emergency[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:08 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/qr[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:08 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:09 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/qr[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:09 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:10 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:10 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/qr[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:10 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:11 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:11 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/qr[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2m10:48:11 pm[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/patients/HC-X3HI2P29/records[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)

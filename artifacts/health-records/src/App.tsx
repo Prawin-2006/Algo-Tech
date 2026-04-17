@@ -14,6 +14,8 @@ import FullAccess from "@/pages/FullAccess";
 import Chatbot from "@/pages/Chatbot";
 import AuditLogs from "@/pages/AuditLogs";
 import AuthPage from "@/pages/AuthPage";
+import ViewRecord from "@/pages/ViewRecord";
+import PatientRequests from "@/pages/PatientRequests";
 import Layout from "@/components/Layout";
 
 const queryClient = new QueryClient({
@@ -38,6 +40,8 @@ function Router() {
       <Route path="/full-access/:patientId" component={FullAccess} />
       <Route path="/chatbot" component={Chatbot} />
       <Route path="/audit" component={AuditLogs} />
+      <Route path="/view-record" component={ViewRecord} />
+      <Route path="/patient-requests" component={PatientRequests} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>

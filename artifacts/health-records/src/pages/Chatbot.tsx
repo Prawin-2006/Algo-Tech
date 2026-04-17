@@ -68,13 +68,22 @@ export default function Chatbot() {
             },
           ]);
         },
-        onError: () => {
+        onError: (error: unknown) => {
+          const fallback = "Sorry, I could not process your query. Please try again.";
+          const maybeError = error as {
+            data?: unknown;
+            message?: string;
+          };
+          const data = maybeError?.data as { response?: string } | undefined;
+          const responseMessage = typeof data?.response === "string" ? data.response : null;
+          const message = responseMessage || maybeError?.message || fallback;
+
           setMessages((prev) => [
             ...prev,
             {
               id: (Date.now() + 1).toString(),
               role: "bot",
-              content: "Sorry, I could not process your query. Please try again.",
+              content: message,
             },
           ]);
         },

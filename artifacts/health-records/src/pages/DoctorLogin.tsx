@@ -7,7 +7,7 @@ import { ShieldCheck, Eye, EyeOff } from "lucide-react";
 
 export default function DoctorLogin() {
   const [, navigate] = useLocation();
-  const { login } = useAuthStore();
+  const { loginDoctor } = useAuthStore();
   const { toast } = useToast();
   const loginMutation = useDoctorLogin();
 
@@ -22,9 +22,9 @@ export default function DoctorLogin() {
       { data: { doctorId, password } },
       {
         onSuccess: (data) => {
-          login(data.doctorId, data.name);
+          loginDoctor(data.doctorId, data.name);
           toast({ title: `Welcome, ${data.name}` });
-          navigate("/patients");
+          navigate("/view-record");
         },
         onError: () => {
           toast({ title: "Invalid credentials", description: "Check your Doctor ID and password", variant: "destructive" });
