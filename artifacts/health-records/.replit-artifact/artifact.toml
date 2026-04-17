@@ -15,7 +15,7 @@ paths = [ "/" ]
 localPort = 18091
 
 [services.development]
-run = "pnpm --filter @workspace/health-records run dev"
+run = "cd /home/runner/workspace/artifacts/health-records && npm run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/health-records", "run", "build" ]
