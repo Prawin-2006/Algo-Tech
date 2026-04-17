@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import QRCode from "qrcode";
 import { db, patientsTable, medicalRecordsTable, auditLogsTable } from "@workspace/db";
 import { eq, count } from "drizzle-orm";
+import { ai } from "@workspace/integrations-gemini-ai";
 import {
   RegisterPatientBody,
   GetPatientParams,
@@ -259,140 +260,83 @@ router.post("/doctors/login", async (req, res): Promise<void> => {
 
 router.post("/chatbot", async (req, res): Promise<void> => {
   const parsed = req.body as { query?: string; patientId?: string | null };
-  const query = (parsed.query ?? "").toLowerCase().trim();
+  const query = (parsed.query ?? "").trim();
 
   if (!query) {
     res.json({ response: "Please ask me something about patient health records.", matchedField: null });
     return;
   }
 
-  let targetPatient: typeof patientsTable.$inferSelect | null = null;
-  let records: typeof medicalRecordsTable.$inferSelect[] = [];
+  let patientContext = "";
 
   if (parsed.patientId) {
     const [p] = await db.select().from(patientsTable).where(eq(patientsTable.id, parsed.patientId));
     if (p) {
-      targetPatient = p;
-      records = await db.select().from(medicalRecordsTable).where(eq(medicalRecordsTable.patientId, parsed.patientId));
+      const records = await db.select().from(medicalRecordsTable).where(eq(medicalRecordsTable.patientId, parsed.patientId));
+      const allergies = (p.allergies ?? []).join(", ") || "None recorded";
+      const diseases = (p.diseases ?? []).join(", ") || "None recorded";
+      const allPrescriptions = records.flatMap(r => r.prescriptions ?? []);
+      const prescriptions = allPrescriptions.join(", ") || "None recorded";
+      const doctors = [...new Set(records.map(r => r.doctorName).filter(Boolean))].join(", ") || "None recorded";
+      const hospitals = [...new Set(records.map(r => r.hospitalName).filter(Boolean))].join(", ") || "None recorded";
+
+      patientContext = `
+PATIENT PROFILE:
+- Name: ${p.name}
+- Age: ${p.age} years
+- Gender: ${p.gender}
+- Blood Group: ${p.bloodGroup}
+- Allergies: ${allergies}
+- Medical Conditions: ${diseases}
+- Emergency Contact: ${p.emergencyContact ?? "Not provided"}
+
+MEDICAL RECORDS (${records.length} total):
+${records.map(r => `  • [${r.recordType}] ${r.title} — ${r.description ?? "No description"} (Date: ${r.visitDate ?? "Unknown"}, Doctor: ${r.doctorName ?? "Unknown"}, Hospital: ${r.hospitalName ?? "Unknown"})`).join("\n") || "  No records uploaded yet."}
+
+PRESCRIPTIONS: ${prescriptions}
+TREATING DOCTORS: ${doctors}
+HOSPITALS VISITED: ${hospitals}
+`;
     }
   }
 
-  const keywordMap: Record<string, { field: string; extract: () => string }> = {
-    allerg: {
-      field: "allergies",
-      extract: () => {
-        if (targetPatient) {
-          const list = targetPatient.allergies ?? [];
-          return list.length ? `Patient ${targetPatient.name} has the following allergies: ${list.join(", ")}.` : `Patient ${targetPatient.name} has no recorded allergies.`;
-        }
-        return "Please specify a patient ID to query allergy information.";
-      },
-    },
-    blood: {
-      field: "bloodGroup",
-      extract: () => {
-        if (targetPatient) return `Patient ${targetPatient.name} has blood group: ${targetPatient.bloodGroup}.`;
-        return "Please specify a patient ID to query blood group information.";
-      },
-    },
-    disease: {
-      field: "diseases",
-      extract: () => {
-        if (targetPatient) {
-          const list = targetPatient.diseases ?? [];
-          return list.length ? `Patient ${targetPatient.name} has the following conditions: ${list.join(", ")}.` : `No diseases recorded for ${targetPatient.name}.`;
-        }
-        return "Please specify a patient ID to query disease information.";
-      },
-    },
-    condition: {
-      field: "diseases",
-      extract: () => {
-        if (targetPatient) {
-          const list = targetPatient.diseases ?? [];
-          return list.length ? `Patient ${targetPatient.name} has the following conditions: ${list.join(", ")}.` : `No conditions recorded for ${targetPatient.name}.`;
-        }
-        return "Please specify a patient ID to query condition information.";
-      },
-    },
-    medicine: {
-      field: "prescriptions",
-      extract: () => {
-        if (records.length) {
-          const allPrescriptions = records.flatMap(r => r.prescriptions ?? []);
-          return allPrescriptions.length ? `Current prescriptions: ${allPrescriptions.join(", ")}.` : "No prescriptions found in records.";
-        }
-        return "Please specify a patient ID to query prescription information.";
-      },
-    },
-    prescription: {
-      field: "prescriptions",
-      extract: () => {
-        if (records.length) {
-          const allPrescriptions = records.flatMap(r => r.prescriptions ?? []);
-          return allPrescriptions.length ? `Current prescriptions: ${allPrescriptions.join(", ")}.` : "No prescriptions found in records.";
-        }
-        return "Please specify a patient ID to query prescription information.";
-      },
-    },
-    doctor: {
-      field: "doctorName",
-      extract: () => {
-        if (records.length) {
-          const doctors = [...new Set(records.map(r => r.doctorName).filter(Boolean))];
-          return doctors.length ? `Doctors who have treated this patient: ${doctors.join(", ")}.` : "No doctor information in records.";
-        }
-        return "Please specify a patient ID to query doctor information.";
-      },
-    },
-    hospital: {
-      field: "hospitalName",
-      extract: () => {
-        if (records.length) {
-          const hospitals = [...new Set(records.map(r => r.hospitalName).filter(Boolean))];
-          return hospitals.length ? `Hospitals visited: ${hospitals.join(", ")}.` : "No hospital information in records.";
-        }
-        return "Please specify a patient ID to query hospital information.";
-      },
-    },
-    emergency: {
-      field: "emergencyContact",
-      extract: () => {
-        if (targetPatient) return targetPatient.emergencyContact ? `Emergency contact: ${targetPatient.emergencyContact}.` : "No emergency contact recorded.";
-        return "Please specify a patient ID to query emergency contact.";
-      },
-    },
-    record: {
-      field: "records",
-      extract: () => {
-        if (records.length) return `This patient has ${records.length} medical record(s): ${records.map(r => r.title).join(", ")}.`;
-        return "Please specify a patient ID to query medical records.";
-      },
-    },
-    age: {
-      field: "age",
-      extract: () => {
-        if (targetPatient) return `Patient ${targetPatient.name} is ${targetPatient.age} years old.`;
-        return "Please specify a patient ID to query age information.";
-      },
-    },
-    help: {
-      field: "help",
-      extract: () => "I can answer questions about: allergies, blood group, diseases/conditions, medicines/prescriptions, doctors, hospitals, emergency contact, medical records, and patient age. Specify a patient ID for personalized answers.",
-    },
-  };
+  const systemPrompt = `You are HealthChain AI, a medical assistant integrated into a secure health records management system for India's healthcare system.
 
-  for (const [keyword, handler] of Object.entries(keywordMap)) {
-    if (query.includes(keyword)) {
-      res.json({ response: handler.extract(), matchedField: handler.field });
-      return;
-    }
+Your role is to help healthcare professionals and patients understand health records, interpret medical data, and answer health-related queries.
+
+Guidelines:
+- Be concise, accurate, and medically responsible
+- When patient data is available, reference it specifically
+- For general medical questions, provide helpful educational information
+- Always recommend consulting a qualified doctor for diagnosis or treatment decisions
+- Keep responses brief (2-4 sentences ideally) unless detail is needed
+- Use plain language that patients can understand
+- If asked about emergency situations, always advise to call emergency services first${patientContext ? `
+
+You have access to the following patient data:
+${patientContext}` : `
+
+No specific patient is selected. Answer the question generally.`}`;
+
+  try {
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: query }] }],
+      config: {
+        systemInstruction: systemPrompt,
+        maxOutputTokens: 8192,
+      },
+    });
+
+    const response = result.text ?? "I'm sorry, I could not generate a response. Please try again.";
+    res.json({ response, matchedField: null });
+  } catch (err) {
+    console.error("Gemini chatbot error:", err);
+    res.json({
+      response: "I'm having trouble processing your request right now. Please try again in a moment.",
+      matchedField: null,
+    });
   }
-
-  res.json({
-    response: "No relevant data found for your query. Try asking about allergies, blood group, diseases, medicines, prescriptions, doctors, or hospitals.",
-    matchedField: null,
-  });
 });
 
 router.get("/audit-logs", async (_req, res): Promise<void> => {
