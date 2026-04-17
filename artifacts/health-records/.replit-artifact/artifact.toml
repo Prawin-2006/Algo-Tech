@@ -1,31 +1,32 @@
 kind = "web"
-previewPath = "/"
-title = "HealthChain - Secure Medical Records"
-version = "1.0.0"
-id = "artifacts/health-records"
-router = "path"
+  previewPath = "/"
+  title = "HealthChain - Secure Medical Records"
+  version = "1.0.0"
+  id = "artifacts/health-records"
+  router = "path"
 
-[[integratedSkills]]
-name = "react-vite"
-version = "1.0.0"
+  [[integratedSkills]]
+  name = "react-vite"
+  version = "1.0.0"
 
-[[services]]
-name = "web"
-paths = [ "/" ]
-localPort = 18091
+  [[services]]
+  name = "web"
+  paths = [ "/" ]
+  localPort = 18091
 
-[services.development]
-run = "cd /home/runner/workspace/artifacts/health-records && npm run dev"
+  [services.development]
+  run = "cd /home/runner/workspace/artifacts/health-records && npm run dev"
 
-[services.production]
-build = [ "pnpm", "--filter", "@workspace/health-records", "run", "build" ]
-publicDir = "artifacts/health-records/dist/public"
-serve = "static"
+  [services.production]
+  build = [ "npm", "-w", "health-records", "run", "build" ]
+  publicDir = "artifacts/health-records/dist/public"
+  serve = "static"
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/*"
+  to = "/index.html"
 
-[services.env]
-PORT = "18091"
-BASE_PATH = "/"
+  [services.env]
+  PORT = "18091"
+  BASE_PATH = "/"
+  

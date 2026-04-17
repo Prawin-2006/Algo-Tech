@@ -2,13 +2,18 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
-    "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
-  },
   "private": true,
+  "workspaces": [
+    "artifacts/*",
+    "lib/*",
+    "lib/integrations/*",
+    "scripts"
+  ],
+  "scripts": {
+    "build": "npm run typecheck && npm --workspaces --if-present run build",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "npm run typecheck:libs && npm -w @workspace/api-server run typecheck && npm -w @workspace/mockup-sandbox run typecheck"
+  },
   "devDependencies": {
     "typescript": "~5.9.2",
     "prettier": "^3.8.1"
