@@ -29,8 +29,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isEmergencyPage = location.startsWith("/emergency/");
+  const isAuthPage = location === "/auth";
 
-  if (isEmergencyPage) {
+  if (isEmergencyPage || isAuthPage) {
     return <>{children}</>;
   }
 
@@ -87,18 +88,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </button>
             </div>
           ) : (
-            <Link href="/doctor-login">
+            <Link href="/auth">
               <span
                 onClick={() => setMobileOpen(false)}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full cursor-pointer",
-                  location === "/doctor-login"
+                  location === "/auth"
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
                 <LogIn className="w-4 h-4" />
-                Doctor Login
+                Sign In / Sign Up
               </span>
             </Link>
           )}
