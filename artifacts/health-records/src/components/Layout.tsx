@@ -30,6 +30,11 @@ const patientNavLinks = [
   { href: "/chatbot", label: "Chatbot", icon: MessageSquare },
   { href: "/audit", label: "Audit Logs", icon: ClipboardList },
 ];
+const guardianNavLinks = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/audit", label: "Audit Logs", icon: ClipboardList },
+  { href: "/guardian-requests", label: "Guardian Request", icon: FolderSearch },
+];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -38,7 +43,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const isEmergencyPage = location.startsWith("/emergency/");
   const isAuthPage = location === "/auth";
-  const navLinks = role === "doctor" ? doctorNavLinks : patientNavLinks;
+  const navLinks =
+    role === "doctor" ? doctorNavLinks : role === "guardian" ? guardianNavLinks : patientNavLinks;
 
   if (isEmergencyPage || isAuthPage) {
     return <>{children}</>;
@@ -88,7 +94,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <p className="text-xs text-muted-foreground">Logged in as</p>
                 <p className="text-sm font-medium text-primary truncate">{name}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  {role === "doctor" ? `Doctor ID: ${doctorId}` : `Patient ID: ${patientId}`}
+                  {role === "doctor"
+                    ? `Doctor ID: ${doctorId}`
+                    : role === "guardian"
+                      ? `Patient ID: ${patientId}`
+                      : `Patient ID: ${patientId}`}
                 </p>
               </div>
               <button

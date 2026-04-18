@@ -4,6 +4,7 @@ import { Users, Search, QrCode, Eye, Upload } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 const bloodGroupColors: Record<string, string> = {
   "O+": "bg-red-50 text-red-700 border-red-200",
@@ -24,6 +25,17 @@ type LocalPatientCredential = {
   age?: number;
   gender?: string;
   bloodGroup?: string;
+};
+
+type CompareLatestResponse = {
+  patient: { id: string; name: string };
+  latestRecord: { id: string; title: string; recordType: string; createdAt: string };
+  previousRecord: { id: string; title: string; recordType: string; createdAt: string };
+  comparison: {
+    fieldChanges: Array<{ field: string; previous: string; latest: string }>;
+    addedNotes: string[];
+    removedNotes: string[];
+  };
 };
 
 function getLocalPatientById(id: string): LocalPatientCredential | null {
@@ -77,6 +89,7 @@ function chooseAge(...values: Array<number | null | undefined>): number | undefi
 
 export default function PatientList() {
   const { role, patientId, name, patientAge, patientGender, patientBloodGroup } = useAuthStore();
+  const { toast } = useToast();
   const isPatientView = role === "patient" && Boolean(patientId);
 
   const localPatients = getAllLocalPatients();
@@ -92,6 +105,9 @@ export default function PatientList() {
   });
 
   const [search, setSearch] = useState("");
+  const [compareLoadingPatientId, setCompareLoadingPatientId] = useState<string | null>(null);
+  const [compareResult, setCompareResult] = useState<CompareLatestResponse | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
   const isLoading = isPatientView ? isOwnLoading : isListLoading;
 
   const localPatient = isPatientView && patientId ? getLocalPatientById(patientId) : null;
@@ -157,6 +173,30 @@ export default function PatientList() {
     p.id.toLowerCase().includes(search.toLowerCase()) ||
     p.bloodGroup.toLowerCase().includes(search.toLowerCase())
   );
+
+  const compareLatestRecords = async (targetPatientId: string) => {
+    setCompareLoadingPatientId(targetPatientId);
+    try {
+      const response = await fetch(
+        `/api/patients/${encodeURIComponent(targetPatientId)}/records/compare-latest`,
+      );
+      const raw = await response.text();
+      const json = raw ? (JSON.parse(raw) as CompareLatestResponse & { error?: string }) : null;
+      if (!response.ok || !json) {
+        throw new Error(json?.error || "Could not compare the latest records.");
+      }
+      setCompareResult(json);
+      setCompareOpen(true);
+    } catch (error) {
+      toast({
+        title: "Comparison failed",
+        description: error instanceof Error ? error.message : "Could not compare the latest records.",
+        variant: "destructive",
+      });
+    } finally {
+      setCompareLoadingPatientId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -231,6 +271,14 @@ export default function PatientList() {
                       {p.bloodGroup}
                     </span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => compareLatestRecords(p.id)}
+                    disabled={compareLoadingPatientId === p.id}
+                    className="mt-1 inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-60"
+                  >
+                    {compareLoadingPatientId === p.id ? "Comparing..." : "Compare Last 2"}
+                  </button>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {p.gender} - {p.age} years - ID: <span className="font-mono">{p.id}</span>
                   </p>
@@ -269,6 +317,90 @@ export default function PatientList() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {compareOpen && compareResult && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl max-h-[88vh] bg-card border border-border rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Latest 2 Record Comparison</p>
+                <p className="text-xs text-muted-foreground">
+                  {compareResult.patient.name} ({compareResult.patient.id})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCompareOpen(false)}
+                className="text-xs px-2.5 py-1 rounded border border-border hover:bg-muted"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-4 bg-background max-h-[74vh] overflow-auto space-y-4">
+              <div className="grid md:grid-cols-2 gap-3 text-xs">
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-muted-foreground">Previous Record</p>
+                  <p className="font-medium text-foreground mt-1">{compareResult.previousRecord.title}</p>
+                  <p className="text-muted-foreground mt-1">
+                    {new Date(compareResult.previousRecord.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-muted-foreground">Latest Record</p>
+                  <p className="font-medium text-foreground mt-1">{compareResult.latestRecord.title}</p>
+                  <p className="text-muted-foreground mt-1">
+                    {new Date(compareResult.latestRecord.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded border border-border bg-card p-3">
+                <p className="text-xs font-semibold text-foreground mb-2">Field Changes</p>
+                {compareResult.comparison.fieldChanges.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No key field changes detected.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {compareResult.comparison.fieldChanges.map((item) => (
+                      <div key={item.field} className="rounded border border-border bg-muted/30 p-2">
+                        <p className="text-xs font-medium text-foreground">{item.field}</p>
+                        <p className="text-xs text-muted-foreground">Previous: {item.previous}</p>
+                        <p className="text-xs text-foreground">Latest: {item.latest}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-xs font-semibold text-emerald-700 mb-2">Added Notes</p>
+                  {compareResult.comparison.addedNotes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No added notes.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {compareResult.comparison.addedNotes.map((line, index) => (
+                        <li key={`${line}-${index}`} className="text-xs text-foreground">+ {line}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-xs font-semibold text-rose-700 mb-2">Removed Notes</p>
+                  {compareResult.comparison.removedNotes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No removed notes.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {compareResult.comparison.removedNotes.map((line, index) => (
+                        <li key={`${line}-${index}`} className="text-xs text-foreground">- {line}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -90,6 +90,17 @@ function decodeBase64Preview(contentBase64: string, limit = 1200): string | null
   }
 }
 
+type CompareLatestResponse = {
+  patient: { id: string; name: string };
+  latestRecord: { id: string; title: string; recordType: string; createdAt: string };
+  previousRecord: { id: string; title: string; recordType: string; createdAt: string };
+  comparison: {
+    fieldChanges: Array<{ field: string; previous: string; latest: string }>;
+    addedNotes: string[];
+    removedNotes: string[];
+  };
+};
+
 export default function PatientDetail() {
   const [openRecordId, setOpenRecordId] = useState<string | null>(null);
   const [popupRecord, setPopupRecord] = useState<{
@@ -106,6 +117,10 @@ export default function PatientDetail() {
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
   const [snapshotUpdating, setSnapshotUpdating] = useState(false);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  const [compareResult, setCompareResult] = useState<CompareLatestResponse | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
   const params = useParams<{ patientId: string }>();
   const requestedPatientId = params.patientId ?? "";
   const {
@@ -252,6 +267,34 @@ export default function PatientDetail() {
     }
   };
 
+  const compareLatestRecords = async () => {
+    if (!patientView?.id) return;
+    setCompareLoading(true);
+    setCompareError(null);
+    try {
+      const response = await fetch(
+        `/api/patients/${encodeURIComponent(patientView.id)}/records/compare-latest`,
+      );
+      const raw = await response.text();
+      const json = raw ? (JSON.parse(raw) as CompareLatestResponse & { error?: string }) : null;
+      if (!response.ok || !json) {
+        throw new Error(json?.error || "Could not compare the latest records.");
+      }
+      setCompareResult(json);
+      setCompareOpen(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not compare the latest records.";
+      setCompareError(message);
+      toast({
+        title: "Comparison failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+
   if (patientLoading) {
     return (
       <div className="space-y-4">
@@ -343,13 +386,26 @@ export default function PatientDetail() {
                   </span>
                 )}
               </h2>
-              <Link href={`/upload/${patientView.id}`}>
-                <a className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-primary/10 text-primary rounded-lg font-medium hover:bg-primary/20 transition-colors">
-                  <Upload className="w-3.5 h-3.5" />
-                  Upload Record
-                </a>
-              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={compareLatestRecords}
+                  disabled={compareLoading || !records || records.length < 2}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg border border-amber-200 font-medium hover:bg-amber-100 disabled:opacity-60"
+                >
+                  {compareLoading ? "Comparing..." : "Compare Last 2"}
+                </button>
+                <Link href={`/upload/${patientView.id}`}>
+                  <a className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-primary/10 text-primary rounded-lg font-medium hover:bg-primary/20 transition-colors">
+                    <Upload className="w-3.5 h-3.5" />
+                    Upload Record
+                  </a>
+                </Link>
+              </div>
             </div>
+            {compareError && (
+              <p className="text-xs text-destructive mb-3">{compareError}</p>
+            )}
 
             {!records || records.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -592,6 +648,90 @@ export default function PatientDetail() {
               ) : (
                 <p className="text-sm text-muted-foreground">Unable to preview this record.</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {compareOpen && compareResult && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl max-h-[88vh] bg-card border border-border rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Latest 2 Record Comparison</p>
+                <p className="text-xs text-muted-foreground">
+                  {compareResult.patient.name} ({compareResult.patient.id})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCompareOpen(false)}
+                className="text-xs px-2.5 py-1 rounded border border-border hover:bg-muted"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-4 bg-background max-h-[74vh] overflow-auto space-y-4">
+              <div className="grid md:grid-cols-2 gap-3 text-xs">
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-muted-foreground">Previous Record</p>
+                  <p className="font-medium text-foreground mt-1">{compareResult.previousRecord.title}</p>
+                  <p className="text-muted-foreground mt-1">
+                    {new Date(compareResult.previousRecord.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-muted-foreground">Latest Record</p>
+                  <p className="font-medium text-foreground mt-1">{compareResult.latestRecord.title}</p>
+                  <p className="text-muted-foreground mt-1">
+                    {new Date(compareResult.latestRecord.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded border border-border bg-card p-3">
+                <p className="text-xs font-semibold text-foreground mb-2">Field Changes</p>
+                {compareResult.comparison.fieldChanges.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No key field changes detected.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {compareResult.comparison.fieldChanges.map((item) => (
+                      <div key={item.field} className="rounded border border-border bg-muted/30 p-2">
+                        <p className="text-xs font-medium text-foreground">{item.field}</p>
+                        <p className="text-xs text-muted-foreground">Previous: {item.previous}</p>
+                        <p className="text-xs text-foreground">Latest: {item.latest}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-xs font-semibold text-emerald-700 mb-2">Added Notes</p>
+                  {compareResult.comparison.addedNotes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No added notes.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {compareResult.comparison.addedNotes.map((line, index) => (
+                        <li key={`${line}-${index}`} className="text-xs text-foreground">+ {line}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-xs font-semibold text-rose-700 mb-2">Removed Notes</p>
+                  {compareResult.comparison.removedNotes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No removed notes.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {compareResult.comparison.removedNotes.map((line, index) => (
+                        <li key={`${line}-${index}`} className="text-xs text-foreground">- {line}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

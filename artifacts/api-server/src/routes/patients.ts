@@ -39,6 +39,14 @@ type AccessRequest = {
   requestedAt: string;
   resolvedAt?: string;
 };
+type GuardianRequest = {
+  id: string;
+  patientId: string;
+  guardianName: string;
+  status: "pending" | "approved" | "rejected";
+  requestedAt: string;
+  resolvedAt?: string;
+};
 type EmergencyOverrideSession = {
   id: string;
   patientId: string;
@@ -53,6 +61,8 @@ const PATIENT_PRIMARY_DOCTOR = new Map<
   PrimaryDoctor
 >();
 const ACCESS_REQUESTS = new Map<string, AccessRequest[]>();
+const GUARDIAN_REQUESTS = new Map<string, GuardianRequest[]>();
+const APPROVED_GUARDIANS = new Map<string, string[]>();
 const EMERGENCY_OVERRIDE_SESSIONS = new Map<string, EmergencyOverrideSession>();
 
 type PatientRow = {
@@ -117,6 +127,8 @@ type PersistedStore = {
   patientPasswords: Array<[string, string]>;
   primaryDoctors: Array<[string, PrimaryDoctor]>;
   accessRequests: Array<[string, AccessRequest[]]>;
+  guardianRequests: Array<[string, GuardianRequest[]]>;
+  approvedGuardians: Array<[string, string[]]>;
   emergencyOverrideSessions: Array<[string, EmergencyOverrideSession]>;
 };
 
@@ -128,6 +140,8 @@ function saveStore(): void {
     patientPasswords: Array.from(PATIENT_PASSWORDS.entries()),
     primaryDoctors: Array.from(PATIENT_PRIMARY_DOCTOR.entries()),
     accessRequests: Array.from(ACCESS_REQUESTS.entries()),
+    guardianRequests: Array.from(GUARDIAN_REQUESTS.entries()),
+    approvedGuardians: Array.from(APPROVED_GUARDIANS.entries()),
     emergencyOverrideSessions: Array.from(EMERGENCY_OVERRIDE_SESSIONS.entries()),
   };
 
@@ -183,6 +197,16 @@ function loadStore(): void {
     ACCESS_REQUESTS.clear();
     for (const [key, value] of parsed.accessRequests ?? []) {
       ACCESS_REQUESTS.set(key, value);
+    }
+
+    GUARDIAN_REQUESTS.clear();
+    for (const [key, value] of parsed.guardianRequests ?? []) {
+      GUARDIAN_REQUESTS.set(key, value);
+    }
+
+    APPROVED_GUARDIANS.clear();
+    for (const [key, value] of parsed.approvedGuardians ?? []) {
+      APPROVED_GUARDIANS.set(key, value);
     }
 
     EMERGENCY_OVERRIDE_SESSIONS.clear();
@@ -870,6 +894,117 @@ function extractCurrentMedicines(patientId: string): string[] {
   return [...medicines];
 }
 
+function extractRecentMedicalRecords(patientId: string): MedicalRecordRow[] {
+  return MEDICAL_RECORDS
+    .filter((record) => record.patientId === patientId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+function splitComparableChunks(text: string): string[] {
+  return text
+    .replace(/\r/g, "\n")
+    .split(/\n+|(?<=[.!?])\s+/g)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line) => line.length >= 4 && line.length <= 220);
+}
+
+function normalizeCompareValue(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9+/.\s-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatCompareField(value: unknown): string {
+  if (Array.isArray(value)) {
+    const joined = value
+      .map((item) => (typeof item === "string" ? item.trim() : ""))
+      .filter(Boolean)
+      .join(", ");
+    return joined || "Not available";
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : "Not available";
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || "Not available";
+  }
+  return "Not available";
+}
+
+type CompareFieldChange = {
+  field: string;
+  previous: string;
+  latest: string;
+};
+
+async function buildRecordComparison(
+  previous: MedicalRecordRow,
+  latest: MedicalRecordRow,
+): Promise<{
+  fieldChanges: CompareFieldChange[];
+  addedNotes: string[];
+  removedNotes: string[];
+}> {
+  const previousText = (await extractReadableTextFromLabResults(previous.labResults)) ?? "";
+  const latestText = (await extractReadableTextFromLabResults(latest.labResults)) ?? "";
+
+  const previousSnapshot = await buildSnapshotFromLabResults(previous.labResults);
+  const latestSnapshot = await buildSnapshotFromLabResults(latest.labResults);
+
+  const fieldChanges: CompareFieldChange[] = [];
+  const fields: Array<{ field: string; previous: unknown; latest: unknown }> = [
+    { field: "Age", previous: previousSnapshot.age, latest: latestSnapshot.age },
+    { field: "Blood Group", previous: previousSnapshot.bloodGroup, latest: latestSnapshot.bloodGroup },
+    { field: "BP", previous: previousSnapshot.bp, latest: latestSnapshot.bp },
+    { field: "Sugar", previous: previousSnapshot.sugar, latest: latestSnapshot.sugar },
+    { field: "Allergies", previous: previousSnapshot.allergies, latest: latestSnapshot.allergies },
+  ];
+
+  for (const entry of fields) {
+    const previousValue = formatCompareField(entry.previous);
+    const latestValue = formatCompareField(entry.latest);
+    if (normalizeCompareValue(previousValue) !== normalizeCompareValue(latestValue)) {
+      fieldChanges.push({
+        field: entry.field,
+        previous: previousValue,
+        latest: latestValue,
+      });
+    }
+  }
+
+  const previousChunks = splitComparableChunks(previousText);
+  const latestChunks = splitComparableChunks(latestText);
+
+  const previousMap = new Map<string, string>();
+  for (const chunk of previousChunks) {
+    const key = normalizeCompareValue(chunk);
+    if (key && !previousMap.has(key)) previousMap.set(key, chunk);
+  }
+  const latestMap = new Map<string, string>();
+  for (const chunk of latestChunks) {
+    const key = normalizeCompareValue(chunk);
+    if (key && !latestMap.has(key)) latestMap.set(key, chunk);
+  }
+
+  const addedNotes = Array.from(latestMap.entries())
+    .filter(([key]) => !previousMap.has(key))
+    .map(([, value]) => value)
+    .slice(0, 8);
+  const removedNotes = Array.from(previousMap.entries())
+    .filter(([key]) => !latestMap.has(key))
+    .map(([, value]) => value)
+    .slice(0, 8);
+
+  return {
+    fieldChanges,
+    addedNotes,
+    removedNotes,
+  };
+}
+
 function getPatientSummary(patient: PatientRow): {
   patientId: string;
   name: string;
@@ -1075,6 +1210,51 @@ router.get("/patients/:patientId/records", async (req, res): Promise<void> => {
 
   const response = await Promise.all(records.map((record) => toRecordResponse(record)));
   res.json(response);
+});
+
+router.get("/patients/:patientId/records/compare-latest", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.patientId) ? req.params.patientId[0] : req.params.patientId;
+  const params = GetPatientRecordsParams.safeParse({ patientId: raw });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const patient = PATIENTS.find((item) => item.id === params.data.patientId);
+  if (!patient) {
+    res.status(404).json({ error: "Patient not found" });
+    return;
+  }
+
+  const records = extractRecentMedicalRecords(params.data.patientId);
+  if (records.length < 2) {
+    res.status(400).json({ error: "At least 2 records are required for comparison." });
+    return;
+  }
+
+  const latest = records[0];
+  const previous = records[1];
+  const comparison = await buildRecordComparison(previous, latest);
+
+  res.json({
+    patient: {
+      id: patient.id,
+      name: patient.name,
+    },
+    latestRecord: {
+      id: latest.id,
+      title: latest.title,
+      recordType: latest.recordType,
+      createdAt: latest.createdAt.toISOString(),
+    },
+    previousRecord: {
+      id: previous.id,
+      title: previous.title,
+      recordType: previous.recordType,
+      createdAt: previous.createdAt.toISOString(),
+    },
+    comparison,
+  });
 });
 
 router.post("/patients/:patientId/records", async (req, res): Promise<void> => {
@@ -1508,6 +1688,111 @@ router.post(
     ACCESS_REQUESTS.set(patientId, [...current]);
     saveStore();
 
+    res.json(target);
+  },
+);
+
+router.post("/guardians/request", async (req, res): Promise<void> => {
+  const body = req.body as {
+    patientId?: string;
+    guardianName?: string;
+  };
+  const patientId = (body.patientId ?? "").trim();
+  const guardianName = (body.guardianName ?? "").trim();
+
+  if (!patientId || !guardianName) {
+    res.status(400).json({ error: "patientId and guardianName are required" });
+    return;
+  }
+
+  const patient = PATIENTS.find((item) => item.id === patientId);
+  if (!patient) {
+    res.status(404).json({ error: "Patient not found" });
+    return;
+  }
+
+  const requests = GUARDIAN_REQUESTS.get(patientId) ?? [];
+  const normalizedName = guardianName.toLowerCase();
+  const existing = requests.find(
+    (item) => item.guardianName.toLowerCase() === normalizedName && item.status === "pending",
+  );
+  if (existing) {
+    res.json(existing);
+    return;
+  }
+
+  const request: GuardianRequest = {
+    id: generateId(),
+    patientId,
+    guardianName,
+    status: "pending",
+    requestedAt: new Date().toISOString(),
+  };
+  GUARDIAN_REQUESTS.set(patientId, [request, ...requests]);
+  saveStore();
+  res.status(201).json(request);
+});
+
+router.get("/patients/:patientId/guardian-requests", async (req, res): Promise<void> => {
+  const patientId = Array.isArray(req.params.patientId)
+    ? req.params.patientId[0]
+    : req.params.patientId;
+  const guardianNameRaw = req.query.guardianName;
+  const guardianName = Array.isArray(guardianNameRaw) ? guardianNameRaw[0] : guardianNameRaw;
+
+  if (!patientId) {
+    res.status(400).json({ error: "patientId is required" });
+    return;
+  }
+
+  const requests = GUARDIAN_REQUESTS.get(patientId) ?? [];
+  if (!guardianName) {
+    res.json(requests);
+    return;
+  }
+
+  const normalized = guardianName.trim().toLowerCase();
+  res.json(requests.filter((item) => item.guardianName.toLowerCase() === normalized));
+});
+
+router.post(
+  "/patients/:patientId/guardian-requests/:requestId/respond",
+  async (req, res): Promise<void> => {
+    const patientId = Array.isArray(req.params.patientId)
+      ? req.params.patientId[0]
+      : req.params.patientId;
+    const requestId = Array.isArray(req.params.requestId)
+      ? req.params.requestId[0]
+      : req.params.requestId;
+    const approved = Boolean((req.body as { approved?: unknown })?.approved);
+
+    if (!patientId || !requestId) {
+      res.status(400).json({ error: "patientId and requestId are required" });
+      return;
+    }
+
+    const requests = GUARDIAN_REQUESTS.get(patientId) ?? [];
+    const target = requests.find((item) => item.id === requestId);
+    if (!target) {
+      res.status(404).json({ error: "Guardian request not found" });
+      return;
+    }
+
+    target.status = approved ? "approved" : "rejected";
+    target.resolvedAt = new Date().toISOString();
+    GUARDIAN_REQUESTS.set(patientId, [...requests]);
+
+    const approvedGuardians = APPROVED_GUARDIANS.get(patientId) ?? [];
+    const normalizedTarget = target.guardianName.toLowerCase();
+    const cleaned = approvedGuardians.filter(
+      (item) => item.toLowerCase() !== normalizedTarget,
+    );
+    if (approved) {
+      cleaned.push(target.guardianName);
+    }
+    APPROVED_GUARDIANS.set(patientId, cleaned);
+
+    saveStore();
     res.json(target);
   },
 );

@@ -79,6 +79,128 @@ function chooseAge(...values: Array<number | null | undefined>): number | null {
   return null;
 }
 
+type VitalIndicator = {
+  status: string;
+  toneClass: string;
+  progressClass: string;
+  progressPercent: number | null;
+};
+
+function clampPercent(value: number): number {
+  return Math.max(0, Math.min(100, value));
+}
+
+function getBpIndicator(bp: string | null): VitalIndicator {
+  if (!bp) {
+    return {
+      status: "Unknown",
+      toneClass: "text-muted-foreground",
+      progressClass: "bg-muted-foreground/40",
+      progressPercent: null,
+    };
+  }
+
+  const match = bp.match(/([0-9]{2,3})\s*\/\s*([0-9]{2,3})/);
+  if (!match) {
+    return {
+      status: "Unclear",
+      toneClass: "text-muted-foreground",
+      progressClass: "bg-muted-foreground/40",
+      progressPercent: null,
+    };
+  }
+
+  const systolic = Number(match[1]);
+  const diastolic = Number(match[2]);
+  const progressPercent = clampPercent(((systolic - 80) / (200 - 80)) * 100);
+
+  if (systolic < 120 && diastolic < 80) {
+    return {
+      status: "Normal",
+      toneClass: "text-emerald-700",
+      progressClass: "bg-emerald-500",
+      progressPercent,
+    };
+  }
+  if (systolic <= 129 && diastolic < 80) {
+    return {
+      status: "Elevated",
+      toneClass: "text-amber-700",
+      progressClass: "bg-amber-500",
+      progressPercent,
+    };
+  }
+  if ((systolic >= 130 && systolic <= 139) || (diastolic >= 80 && diastolic <= 89)) {
+    return {
+      status: "High Stage 1",
+      toneClass: "text-orange-700",
+      progressClass: "bg-orange-500",
+      progressPercent,
+    };
+  }
+  return {
+    status: "High Stage 2",
+    toneClass: "text-rose-700",
+    progressClass: "bg-rose-500",
+    progressPercent,
+  };
+}
+
+function getSugarIndicator(sugar: string | null): VitalIndicator {
+  if (!sugar) {
+    return {
+      status: "Unknown",
+      toneClass: "text-muted-foreground",
+      progressClass: "bg-muted-foreground/40",
+      progressPercent: null,
+    };
+  }
+
+  const match = sugar.match(/([0-9]{2,3}(?:\.[0-9]+)?)/);
+  const sugarValue = match ? Number(match[1]) : Number.NaN;
+  if (!Number.isFinite(sugarValue)) {
+    return {
+      status: "Unclear",
+      toneClass: "text-muted-foreground",
+      progressClass: "bg-muted-foreground/40",
+      progressPercent: null,
+    };
+  }
+
+  const progressPercent = clampPercent(((sugarValue - 60) / (250 - 60)) * 100);
+
+  if (sugarValue < 70) {
+    return {
+      status: "Low",
+      toneClass: "text-rose-700",
+      progressClass: "bg-rose-500",
+      progressPercent,
+    };
+  }
+  if (sugarValue <= 99) {
+    return {
+      status: "Normal",
+      toneClass: "text-emerald-700",
+      progressClass: "bg-emerald-500",
+      progressPercent,
+    };
+  }
+  if (sugarValue <= 125) {
+    return {
+      status: "Prediabetes",
+      toneClass: "text-amber-700",
+      progressClass: "bg-amber-500",
+      progressPercent,
+    };
+  }
+  return {
+    status: "High",
+    toneClass: "text-rose-700",
+    progressClass: "bg-rose-500",
+    progressPercent,
+  };
+}
+
 export default function Dashboard() {
   const { role, patientId, patientAge, patientBloodGroup } = useAuthStore();
   const isPatientView = role === "patient" && Boolean(patientId);
@@ -105,6 +227,8 @@ export default function Dashboard() {
   const recentPatients = patientList.slice(-3).reverse();
   const ownRecordList = (Array.isArray(ownRecords) ? ownRecords : []) as Array<Record<string, unknown>>;
   const patientVitals = getLatestVitals(ownRecordList);
+  const bpIndicator = getBpIndicator(patientVitals.bp);
+  const sugarIndicator = getSugarIndicator(patientVitals.sugar);
   const snapshotBloodGroup = chooseKnownText(patientBloodGroup, ownPatient?.bloodGroup) ?? "Unknown";
   const snapshotAgeNumber = chooseAge(patientAge, ownPatient?.age);
   const snapshotAge = snapshotAgeNumber ? `${snapshotAgeNumber} years` : "Unknown";
@@ -160,6 +284,15 @@ export default function Dashboard() {
             <div className="rounded-lg border border-border p-3 bg-muted/20">
               <p className="text-xs text-muted-foreground">BP</p>
               <p className="text-sm font-semibold text-foreground mt-1">{patientVitals.bp ?? "Unknown"}</p>
+              <p className={cn("text-[11px] mt-1 font-medium", bpIndicator.toneClass)}>
+                {bpIndicator.status}
+              </p>
+              <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn("h-full rounded-full", bpIndicator.progressClass)}
+                  style={{ width: `${bpIndicator.progressPercent ?? 0}%` }}
+                />
+              </div>
             </div>
             <div className="rounded-lg border border-border p-3 bg-muted/20">
               <p className="text-xs text-muted-foreground">Blood Group</p>
@@ -172,6 +305,15 @@ export default function Dashboard() {
             <div className="rounded-lg border border-border p-3 bg-muted/20">
               <p className="text-xs text-muted-foreground">Sugar Level</p>
               <p className="text-sm font-semibold text-foreground mt-1">{patientVitals.sugar ?? "Unknown"}</p>
+              <p className={cn("text-[11px] mt-1 font-medium", sugarIndicator.toneClass)}>
+                {sugarIndicator.status}
+              </p>
+              <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn("h-full rounded-full", sugarIndicator.progressClass)}
+                  style={{ width: `${sugarIndicator.progressPercent ?? 0}%` }}
+                />
+              </div>
             </div>
             <div className="rounded-lg border border-border p-3 bg-muted/20">
               <p className="text-xs text-muted-foreground">Allergies</p>

@@ -4,7 +4,7 @@ import { persist } from "zustand/middleware";
 interface AuthState {
   doctorId: string | null;
   patientId: string | null;
-  role: "doctor" | "patient" | null;
+  role: "doctor" | "patient" | "guardian" | null;
   name: string | null;
   patientAge: number | null;
   patientGender: string | null;
@@ -15,6 +15,7 @@ interface AuthState {
     name: string,
     profile?: { age?: number | null; gender?: string | null; bloodGroup?: string | null },
   ) => void;
+  loginGuardian: (patientId: string, guardianName: string) => void;
   logout: () => void;
 }
 
@@ -47,6 +48,16 @@ export const useAuthStore = create<AuthState>()(
           patientAge: profile?.age ?? null,
           patientGender: profile?.gender ?? null,
           patientBloodGroup: profile?.bloodGroup ?? null,
+        }),
+      loginGuardian: (patientId, guardianName) =>
+        set({
+          doctorId: null,
+          patientId,
+          role: "guardian",
+          name: guardianName,
+          patientAge: null,
+          patientGender: null,
+          patientBloodGroup: null,
         }),
       logout: () =>
         set({

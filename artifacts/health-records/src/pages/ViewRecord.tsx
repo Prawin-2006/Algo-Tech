@@ -53,8 +53,32 @@ type RecordViewResponse = {
   }>;
 };
 
+type CompareLatestResponse = {
+  patient: { id: string; name: string };
+  latestRecord: { id: string; title: string; recordType: string; createdAt: string };
+  previousRecord: { id: string; title: string; recordType: string; createdAt: string };
+  comparison: {
+    fieldChanges: Array<{ field: string; previous: string; latest: string }>;
+    addedNotes: string[];
+    removedNotes: string[];
+  };
+};
+
+type AccessRequest = {
+  id: string;
+  patientId: string;
+  doctorId: string;
+  doctorName: string;
+  status: "pending" | "approved" | "rejected";
+  requestedAt: string;
+};
+
+type DoctorAccessState = "none" | "pending" | "approved" | "rejected" | "unknown";
+
 export default function ViewRecord() {
   const { role, doctorId, name } = useAuthStore();
+  const currentDoctorId = doctorId ?? "";
+  const currentDoctorName = name ?? "";
   const { toast } = useToast();
   const [patientId, setPatientId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -74,6 +98,12 @@ export default function ViewRecord() {
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
   const [snapshotUpdating, setSnapshotUpdating] = useState(false);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  const [compareResult, setCompareResult] = useState<CompareLatestResponse | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [accessState, setAccessState] = useState<DoctorAccessState>("none");
+  const [checkingAccess, setCheckingAccess] = useState(false);
 
   useEffect(() => {
     if (!popupRecord || !popupRecord.contentBase64 || !popupRecord.mimeType.toLowerCase().includes("pdf")) {
@@ -94,13 +124,63 @@ export default function ViewRecord() {
     }
   }, [popupRecord]);
 
-  if (role !== "doctor" || !doctorId || !name) {
-    return (
-      <div className="max-w-md mx-auto mt-12 text-center">
-        <p className="text-sm text-muted-foreground">Doctor login required to view records.</p>
-      </div>
-    );
-  }
+  const checkDoctorAccess = async (targetPatientId: string) => {
+    const trimmedPatientId = targetPatientId.trim();
+    if (!trimmedPatientId) {
+      setAccessState("none");
+      return;
+    }
+
+    setCheckingAccess(true);
+    try {
+      const response = await fetch(
+        `/api/patients/${encodeURIComponent(trimmedPatientId)}/requests`,
+      );
+      const raw = await response.text();
+      const json = raw ? (JSON.parse(raw) as AccessRequest[]) : [];
+      if (!response.ok || !Array.isArray(json)) {
+        setAccessState("unknown");
+        return;
+      }
+
+      const matching = json
+        .filter((item) => item.doctorId === currentDoctorId)
+        .sort(
+          (a, b) =>
+            new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime(),
+        );
+
+      if (matching.length === 0) {
+        setAccessState("none");
+        return;
+      }
+      const statuses = matching.map((item) => item.status);
+      if (statuses.includes("approved")) {
+        setAccessState("approved");
+        return;
+      }
+      if (statuses.includes("pending")) {
+        setAccessState("pending");
+        return;
+      }
+      if (statuses.includes("rejected")) {
+        setAccessState("rejected");
+        return;
+      }
+      setAccessState("none");
+    } catch {
+      setAccessState("unknown");
+    } finally {
+      setCheckingAccess(false);
+    }
+  };
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      checkDoctorAccess(patientId);
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [patientId, currentDoctorId]);
 
   const requestAccess = async () => {
     if (!patientId.trim()) return;
@@ -109,7 +189,11 @@ export default function ViewRecord() {
       const res = await fetch("/api/records/request-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patientId: patientId.trim(), doctorId, doctorName: name }),
+        body: JSON.stringify({
+          patientId: patientId.trim(),
+          doctorId: currentDoctorId,
+          doctorName: currentDoctorName,
+        }),
       });
       const raw = await res.text();
       const json = raw ? (JSON.parse(raw) as { error?: string }) : null;
@@ -120,6 +204,7 @@ export default function ViewRecord() {
         );
       }
       toast({ title: "Access request sent", description: "Patient can approve it in Requests page." });
+      await checkDoctorAccess(patientId);
     } catch (error) {
       toast({
         title: "Request failed",
@@ -138,9 +223,19 @@ export default function ViewRecord() {
 
   const viewRecords = async () => {
     if (!patientId.trim()) return;
+    if (accessState !== "approved") {
+      toast({
+        title: "Access not approved",
+        description: "View Record becomes available after patient approval.",
+        variant: "destructive",
+      });
+      return;
+    }
     setLoading(true);
     try {
-      const res = await fetch(`/api/records/doctor-view/${encodeURIComponent(patientId.trim())}?doctorId=${encodeURIComponent(doctorId)}`);
+      const res = await fetch(
+        `/api/records/doctor-view/${encodeURIComponent(patientId.trim())}?doctorId=${encodeURIComponent(currentDoctorId)}`,
+      );
       const raw = await res.text();
       const json = raw ? (JSON.parse(raw) as RecordViewResponse & { error?: string }) : null;
       if (!res.ok) {
@@ -169,6 +264,26 @@ export default function ViewRecord() {
       setLoading(false);
     }
   };
+
+  const canViewRecords = accessState === "approved";
+  const accessHint =
+    accessState === "approved"
+      ? "Access approved. You can view records."
+      : accessState === "pending"
+        ? "Request sent. Waiting for patient approval."
+        : accessState === "rejected"
+          ? "Patient rejected access. Send a new request."
+          : accessState === "unknown"
+            ? "Could not verify access state right now."
+            : "Send request first. View Record unlocks after approval.";
+
+  if (role !== "doctor" || !doctorId || !name) {
+    return (
+      <div className="max-w-md mx-auto mt-12 text-center">
+        <p className="text-sm text-muted-foreground">Doctor login required to view records.</p>
+      </div>
+    );
+  }
 
   const summarizePopupRecord = async () => {
     if (!popupRecord) return;
@@ -226,6 +341,35 @@ export default function ViewRecord() {
     }
   };
 
+  const compareLatestRecords = async () => {
+    const targetPatientId = data?.patient.id ?? patientId.trim();
+    if (!targetPatientId) return;
+    setCompareLoading(true);
+    setCompareError(null);
+    try {
+      const response = await fetch(
+        `/api/patients/${encodeURIComponent(targetPatientId)}/records/compare-latest`,
+      );
+      const raw = await response.text();
+      const json = raw ? (JSON.parse(raw) as CompareLatestResponse & { error?: string }) : null;
+      if (!response.ok || !json) {
+        throw new Error(json?.error || "Could not compare the latest records.");
+      }
+      setCompareResult(json);
+      setCompareOpen(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not compare the latest records.";
+      setCompareError(message);
+      toast({
+        title: "Comparison failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
@@ -253,12 +397,21 @@ export default function ViewRecord() {
           </button>
           <button
             onClick={viewRecords}
-            disabled={loading || !patientId.trim()}
+            disabled={loading || !patientId.trim() || !canViewRecords || checkingAccess}
             className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
           >
             <span className="inline-flex items-center gap-2"><Lock className="w-4 h-4" />View Record</span>
           </button>
+          <button
+            onClick={compareLatestRecords}
+            disabled={loading || compareLoading || !(data?.records && data.records.length >= 2)}
+            className="px-4 py-2 rounded-lg bg-amber-50 text-amber-700 text-sm font-medium border border-amber-200 disabled:opacity-60"
+          >
+            {compareLoading ? "Comparing..." : "Compare Last 2"}
+          </button>
         </div>
+        <p className="text-xs text-muted-foreground">{checkingAccess ? "Checking access..." : accessHint}</p>
+        {compareError && <p className="text-xs text-destructive">{compareError}</p>}
       </div>
 
       {data && (
@@ -398,6 +551,90 @@ export default function ViewRecord() {
               ) : (
                 <p className="text-sm text-muted-foreground">No readable text could be extracted from this record.</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {compareOpen && compareResult && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl max-h-[88vh] bg-card border border-border rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Latest 2 Record Comparison</p>
+                <p className="text-xs text-muted-foreground">
+                  {compareResult.patient.name} ({compareResult.patient.id})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCompareOpen(false)}
+                className="text-xs px-2.5 py-1 rounded border border-border hover:bg-muted"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-4 bg-background max-h-[74vh] overflow-auto space-y-4">
+              <div className="grid md:grid-cols-2 gap-3 text-xs">
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-muted-foreground">Previous Record</p>
+                  <p className="font-medium text-foreground mt-1">{compareResult.previousRecord.title}</p>
+                  <p className="text-muted-foreground mt-1">
+                    {new Date(compareResult.previousRecord.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-muted-foreground">Latest Record</p>
+                  <p className="font-medium text-foreground mt-1">{compareResult.latestRecord.title}</p>
+                  <p className="text-muted-foreground mt-1">
+                    {new Date(compareResult.latestRecord.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded border border-border bg-card p-3">
+                <p className="text-xs font-semibold text-foreground mb-2">Field Changes</p>
+                {compareResult.comparison.fieldChanges.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No key field changes detected.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {compareResult.comparison.fieldChanges.map((item) => (
+                      <div key={item.field} className="rounded border border-border bg-muted/30 p-2">
+                        <p className="text-xs font-medium text-foreground">{item.field}</p>
+                        <p className="text-xs text-muted-foreground">Previous: {item.previous}</p>
+                        <p className="text-xs text-foreground">Latest: {item.latest}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-xs font-semibold text-emerald-700 mb-2">Added Notes</p>
+                  {compareResult.comparison.addedNotes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No added notes.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {compareResult.comparison.addedNotes.map((line, index) => (
+                        <li key={`${line}-${index}`} className="text-xs text-foreground">+ {line}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="rounded border border-border bg-card p-3">
+                  <p className="text-xs font-semibold text-rose-700 mb-2">Removed Notes</p>
+                  {compareResult.comparison.removedNotes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No removed notes.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {compareResult.comparison.removedNotes.map((line, index) => (
+                        <li key={`${line}-${index}`} className="text-xs text-foreground">- {line}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

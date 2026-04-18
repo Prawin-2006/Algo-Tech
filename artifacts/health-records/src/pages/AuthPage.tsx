@@ -12,10 +12,11 @@ import {
   Lock,
   IdCard,
   UserRound,
+  ShieldCheck,
 } from "lucide-react";
 
 type Mode = "signin" | "signup";
-type AccountType = "doctor" | "patient";
+type AccountType = "doctor" | "patient" | "guardian";
 type BloodGroup = "A+" | "A-" | "B+" | "B-" | "O+" | "O-" | "AB+" | "AB-";
 
 const bloodGroups: BloodGroup[] = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
@@ -104,7 +105,7 @@ async function syncBackendPatientProfile(
 
 export default function AuthPage() {
   const [, navigate] = useLocation();
-  const { loginDoctor, loginPatient } = useAuthStore();
+  const { loginDoctor, loginPatient, loginGuardian } = useAuthStore();
   const { toast } = useToast();
 
   const doctorLoginMutation = useDoctorLogin();
@@ -116,6 +117,7 @@ export default function AuthPage() {
   const [rememberDevice, setRememberDevice] = useState(true);
 
   const [doctorSignIn, setDoctorSignIn] = useState({ doctorId: "", doctorName: "" });
+  const [guardianSignIn, setGuardianSignIn] = useState({ patientId: "", guardianName: "" });
   const [patientSignIn, setPatientSignIn] = useState({
     patientName: "",
     password: "",
@@ -371,6 +373,33 @@ export default function AuthPage() {
     );
   };
 
+  const handleGuardianSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const targetPatientId = guardianSignIn.patientId.trim();
+      const guardianName = guardianSignIn.guardianName.trim();
+      if (!targetPatientId || !guardianName) {
+        throw new Error("Patient ID and Guardian Name are required.");
+      }
+
+      const patientRes = await fetch(`/api/patients/${encodeURIComponent(targetPatientId)}`);
+      const patientData = (await patientRes.json()) as { id?: string; error?: string };
+      if (!patientRes.ok || !patientData.id) {
+        throw new Error(patientData.error || "Invalid patient ID.");
+      }
+
+      loginGuardian(targetPatientId, guardianName);
+      toast({ title: `Welcome, ${guardianName}` });
+      navigate("/guardian-requests");
+    } catch (error) {
+      toast({
+        title: "Invalid credentials",
+        description: error instanceof Error ? error.message : "Use Patient ID and Guardian Name.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-10">
       <div className="mx-auto max-w-md">
@@ -417,7 +446,7 @@ export default function AuthPage() {
           {mode === "signin" && (
             <>
               <p className="mb-2 mt-6 text-sm font-semibold text-slate-700">I am a</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => setAccountType("doctor")}
@@ -448,6 +477,22 @@ export default function AuthPage() {
                   </div>
                   <p className="text-base font-semibold text-slate-900">Patient</p>
                   <p className="text-xs text-slate-500">Personal Health</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAccountType("guardian")}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    accountType === "guardian"
+                      ? "border-sky-500 bg-sky-50"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                    <ShieldCheck className="h-5 w-5 text-slate-600" />
+                  </div>
+                  <p className="text-base font-semibold text-slate-900">Guardian</p>
+                  <p className="text-xs text-slate-500">Patient Delegate</p>
                 </button>
               </div>
 
@@ -499,6 +544,45 @@ export default function AuthPage() {
                     className="w-full rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"
                   >
                     {isSigningIn ? "Signing in..." : "Sign In as Doctor"}
+                  </button>
+                </form>
+              ) : accountType === "guardian" ? (
+                <form onSubmit={handleGuardianSignIn} className="mt-5 space-y-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-800">Patient ID</label>
+                    <div className="relative">
+                      <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        required
+                        value={guardianSignIn.patientId}
+                        onChange={(e) => setGuardianSignIn((s) => ({ ...s, patientId: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                        placeholder="HC-XXXXXXXX"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-800">Guardian Name</label>
+                    <div className="relative">
+                      <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        required
+                        value={guardianSignIn.guardianName}
+                        onChange={(e) => setGuardianSignIn((s) => ({ ...s, guardianName: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none ring-sky-500 transition focus:ring-2"
+                        placeholder="Guardian full name"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700"
+                  >
+                    Sign In as Guardian
                   </button>
                 </form>
               ) : (

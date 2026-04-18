@@ -42,6 +42,7 @@ function Router() {
       <Route path="/audit" component={AuditLogs} />
       <Route path="/view-record" component={ViewRecord} />
       <Route path="/patient-requests" component={PatientRequests} />
+      <Route path="/guardian-requests" component={PatientRequests} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>

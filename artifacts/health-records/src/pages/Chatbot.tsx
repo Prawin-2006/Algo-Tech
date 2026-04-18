@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useChatbotQuery, useListPatients } from "@workspace/api-client-react";
 import { MessageSquare, Send, Bot, User } from "lucide-react";
+import { useAuthStore } from "@/store/useAuth";
 
 interface Message {
   id: string;
@@ -19,11 +20,17 @@ const SUGGESTIONS = [
 ];
 
 export default function Chatbot() {
+  const { role, patientId: authPatientId, name: authName } = useAuthStore();
+  const isDoctor = role === "doctor";
+  const isPatient = role === "patient";
+  const fixedPatientId = !isDoctor ? authPatientId ?? null : null;
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "0",
       role: "bot",
-      content: "Hello! I am the HealthChain medical assistant. Ask me about patient allergies, blood groups, diseases, prescriptions, or other medical information. You can select a patient for personalized answers.",
+      content:
+        "Hello! I am the HealthChain medical assistant. Ask me about patient allergies, blood groups, diseases, prescriptions, or other medical information.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -34,8 +41,22 @@ export default function Chatbot() {
   const queryMutation = useChatbotQuery();
 
   useEffect(() => {
+    if (fixedPatientId) {
+      setSelectedPatientId(fixedPatientId);
+      return;
+    }
+    if (isDoctor) {
+      setSelectedPatientId("");
+    }
+  }, [fixedPatientId, isDoctor]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const requestPatientId = isDoctor
+    ? null
+    : fixedPatientId ?? (selectedPatientId || null);
 
   const handleSend = async (query?: string) => {
     const text = query ?? input.trim();
@@ -53,7 +74,7 @@ export default function Chatbot() {
       {
         data: {
           query: text,
-          patientId: selectedPatientId || null,
+          patientId: requestPatientId,
         },
       },
       {
@@ -103,7 +124,18 @@ export default function Chatbot() {
         </div>
       </div>
 
-      {patients && patients.length > 0 && (
+      {isPatient && authPatientId && (
+        <div className="bg-card border border-border rounded-xl p-4">
+          <label className="block text-xs font-medium text-muted-foreground mb-2">
+            Patient Context
+          </label>
+          <div className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm">
+            {authName ?? "Patient"} ({authPatientId})
+          </div>
+        </div>
+      )}
+
+      {!isDoctor && !isPatient && patients && patients.length > 0 && (
         <div className="bg-card border border-border rounded-xl p-4">
           <label className="block text-xs font-medium text-muted-foreground mb-2">
             Patient Context (optional)
