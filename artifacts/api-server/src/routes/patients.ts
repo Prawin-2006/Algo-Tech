@@ -75,6 +75,12 @@ type PatientRow = {
   bloodGroup: string;
   allergies: string[];
   diseases: string[];
+  dateOfBirth: string | null;
+  maritalStatus: string | null;
+  abhaNumber: string | null;
+  pastMedicalHistory: string[];
+  surgeryHistory: string | null;
+  currentMedicines: string[];
   emergencyContact: string | null;
   createdAt: Date;
 };
@@ -119,6 +125,20 @@ const LEGACY_STORE_FILE_PATHS = [
   path.resolve(process.cwd(), "artifacts", "api-server", "data", "patient-store.json"),
   path.resolve(process.cwd(), "data", "patient-store.json"),
 ];
+
+function normalizePatientRow(patient: PatientRow): PatientRow {
+  return {
+    ...patient,
+    allergies: Array.isArray(patient.allergies) ? patient.allergies : [],
+    diseases: Array.isArray(patient.diseases) ? patient.diseases : [],
+    dateOfBirth: typeof patient.dateOfBirth === "string" ? patient.dateOfBirth : null,
+    maritalStatus: typeof patient.maritalStatus === "string" ? patient.maritalStatus : null,
+    abhaNumber: typeof patient.abhaNumber === "string" ? patient.abhaNumber : null,
+    pastMedicalHistory: Array.isArray(patient.pastMedicalHistory) ? patient.pastMedicalHistory : [],
+    surgeryHistory: typeof patient.surgeryHistory === "string" ? patient.surgeryHistory : null,
+    currentMedicines: Array.isArray(patient.currentMedicines) ? patient.currentMedicines : [],
+  };
+}
 
 type PersistedStore = {
   patients: Array<Omit<PatientRow, "createdAt"> & { createdAt: string }>;
@@ -165,10 +185,12 @@ function loadStore(): void {
     ) as Partial<PersistedStore>;
 
     const loadedPatients =
-      parsed.patients?.map((p) => ({
-        ...p,
-        createdAt: new Date(p.createdAt),
-      })) ?? [];
+      parsed.patients?.map((p) =>
+        normalizePatientRow({
+          ...p,
+          createdAt: new Date(p.createdAt),
+        } as PatientRow),
+      ) ?? [];
     const loadedRecords =
       parsed.records?.map((r) => ({
         ...r,
@@ -220,8 +242,68 @@ function loadStore(): void {
 
 loadStore();
 
-function buildFallbackChatResponse(query: string): string {
+function buildFallbackChatResponse(
+  query: string,
+  context?: { patient?: PatientRow | null; records?: MedicalRecordRow[] },
+): string {
   const q = query.toLowerCase();
+  const patient = context?.patient ?? null;
+  const records = context?.records ?? [];
+  const recordSearchAnswer = patient
+    ? answerPatientQueryFromRecords(query, patient, records)
+    : null;
+
+  if (patient) {
+    const allergies = (patient.allergies ?? []).filter(Boolean);
+    const diseases = ((patient.pastMedicalHistory ?? []).length > 0
+      ? patient.pastMedicalHistory
+      : patient.diseases ?? []).filter(Boolean);
+    const currentMedicines = (patient.currentMedicines ?? []).filter(Boolean);
+    const prescriptions = [...new Set(records.flatMap((record) => record.prescriptions ?? []).filter(Boolean))];
+    const doctors = [...new Set(records.map((record) => record.doctorName).filter(Boolean))];
+
+    if (q.includes("allerg")) {
+      return allergies.length > 0
+        ? `Known allergies for ${patient.name}: ${allergies.join(", ")}.`
+        : `${patient.name} has no recorded allergies in current records.`;
+    }
+    if (q.includes("blood group") || q.includes("blood type")) {
+      return `${patient.name}'s blood group is ${patient.bloodGroup || "not recorded"}.`;
+    }
+    if (q.includes("disease") || q.includes("condition")) {
+      return diseases.length > 0
+        ? `Known medical conditions for ${patient.name}: ${diseases.join(", ")}.`
+        : `No major medical conditions are recorded for ${patient.name}.`;
+    }
+    if (q.includes("prescription") || q.includes("medicine") || q.includes("medication")) {
+      if (prescriptions.length > 0) {
+        return `Recent prescriptions for ${patient.name}: ${prescriptions.join(", ")}.`;
+      }
+      if (currentMedicines.length > 0) {
+        return `Current medicines listed for ${patient.name}: ${currentMedicines.join(", ")}.`;
+      }
+      if (recordSearchAnswer) {
+        return recordSearchAnswer;
+      }
+      return `No prescriptions are recorded yet for ${patient.name}.`;
+    }
+    if (q.includes("emergency")) {
+      return patient.emergencyContact
+        ? `Emergency contact for ${patient.name}: ${patient.emergencyContact}.`
+        : `Emergency contact is not recorded for ${patient.name}.`;
+    }
+    if (q.includes("doctor") || q.includes("treating")) {
+      return doctors.length > 0
+        ? `Treating doctors found for ${patient.name}: ${doctors.join(", ")}.`
+        : `Treating doctor details are not recorded yet for ${patient.name}.`;
+    }
+
+    if (recordSearchAnswer) {
+      return recordSearchAnswer;
+    }
+
+    return `Using ${patient.name}'s records. You can ask about allergies, blood group, conditions, prescriptions, or emergency contact.`;
+  }
 
   if (q.includes("allerg")) {
     return "To check allergies accurately, select a patient first. In general, verify allergy history before prescribing and monitor for severe reactions.";
@@ -240,6 +322,96 @@ function buildFallbackChatResponse(query: string): string {
   }
 
   return "I can help with allergies, blood group, diseases, prescriptions, and emergency-related medical record questions. Select a patient for personalized answers.";
+}
+
+function extractRecordTextForSearch(record: MedicalRecordRow): string {
+  const segments: string[] = [];
+  if (record.title) segments.push(record.title);
+  if (record.description) segments.push(record.description);
+  if (record.recordType) segments.push(record.recordType);
+  if (record.prescriptions?.length) segments.push(`Prescriptions: ${record.prescriptions.join(", ")}`);
+
+  if (record.labResults && typeof record.labResults === "object") {
+    const lab = record.labResults as Record<string, unknown>;
+    const extracted = typeof lab.extractedText === "string" ? lab.extractedText : "";
+    const html = typeof lab.extractedHtml === "string" ? stripHtmlTags(lab.extractedHtml) : "";
+    const explicitFields = [
+      typeof lab.bloodGroup === "string" ? `Blood Group ${lab.bloodGroup}` : "",
+      typeof lab.bp === "string" ? `Blood Pressure ${lab.bp}` : "",
+      typeof lab.bloodPressure === "string" ? `Blood Pressure ${lab.bloodPressure}` : "",
+      typeof lab.sugar === "string" ? `Sugar ${lab.sugar}` : "",
+      typeof lab.bloodSugar === "string" ? `Blood Sugar ${lab.bloodSugar}` : "",
+    ].filter(Boolean);
+    if (explicitFields.length) segments.push(explicitFields.join(". "));
+    if (extracted) segments.push(extracted.slice(0, 9000));
+    if (html) segments.push(html.slice(0, 3000));
+  }
+
+  return segments.join("\n");
+}
+
+function answerPatientQueryFromRecords(
+  query: string,
+  patient: PatientRow,
+  records: MedicalRecordRow[],
+): string | null {
+  const rawTokens = query
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  const stopWords = new Set([
+    "is", "are", "the", "a", "an", "for", "of", "to", "and", "or", "in", "on",
+    "this", "that", "with", "about", "any", "does", "do", "have", "has", "patient",
+    "lavanya", "u", "what", "who", "when", "where", "why", "how",
+  ]);
+  const tokens = [...new Set(rawTokens.filter((token) => token.length > 2 && !stopWords.has(token)))];
+  if (tokens.length === 0) return null;
+
+  const snippets: string[] = [];
+  snippets.push(
+    `Patient Name: ${patient.name}`,
+    `Age: ${patient.age} years`,
+    `Gender: ${patient.gender}`,
+    `Blood Group: ${patient.bloodGroup}`,
+    `Allergies: ${(patient.allergies ?? []).join(", ") || "None recorded"}`,
+    `Conditions: ${(patient.pastMedicalHistory ?? []).join(", ") || (patient.diseases ?? []).join(", ") || "None recorded"}`,
+    `Surgery History: ${patient.surgeryHistory || "Not recorded"}`,
+    `Current Medicines: ${(patient.currentMedicines ?? []).join(", ") || "None recorded"}`,
+    `Emergency Contact: ${patient.emergencyContact || "Not recorded"}`,
+  );
+
+  for (const record of records) {
+    const text = extractRecordTextForSearch(record);
+    if (!text) continue;
+    const parts = text
+      .split(/[\n]|(?<=[.!?])\s+/)
+      .map((item) => item.replace(/\s+/g, " ").trim())
+      .filter((item) => item.length >= 8 && item.length <= 240);
+    snippets.push(...parts.slice(0, 120));
+  }
+
+  const scored = snippets
+    .map((snippet) => {
+      const normalized = snippet.toLowerCase();
+      let score = 0;
+      for (const token of tokens) {
+        if (normalized.includes(token)) score += 1;
+      }
+      if (normalized.includes("not recorded") || normalized.includes("none recorded")) {
+        score -= 0.2;
+      }
+      return { snippet, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (scored.length === 0) {
+    return `I could not find a direct mention for "${query}" in ${patient.name}'s current records.`;
+  }
+
+  const best = [...new Set(scored.slice(0, 3).map((item) => item.snippet))];
+  return `From ${patient.name}'s records: ${best.join(" ")}`;
 }
 
 function stripHtmlTags(value: string): string {
@@ -268,6 +440,12 @@ type ExtractedSnapshot = {
   bp?: string;
   sugar?: string;
   allergies?: string[];
+  dateOfBirth?: string;
+  maritalStatus?: string;
+  abhaNumber?: string;
+  pastMedicalHistory?: string[];
+  surgeryHistory?: string;
+  currentMedicines?: string[];
 };
 
 function asOptionalString(value: unknown): string | null {
@@ -354,6 +532,130 @@ function sanitizeAllergies(value: unknown): string[] | null {
   return null;
 }
 
+function sanitizeStringList(value: unknown): string[] | null {
+  const normalize = (input: string): string =>
+    input
+      .replace(/\s+/g, " ")
+      .replace(/[.]+$/g, "")
+      .trim();
+
+  const isLikelyContent = (item: string): boolean => {
+    const upper = item.toUpperCase();
+    if (!item) return false;
+    if (item.length > 120) return false;
+    if (item.includes("|")) return false;
+    if (
+      upper === "BLOOD GROUP" ||
+      upper === "KNOWN ALLERGIES" ||
+      upper === "MEDICAL HISTORY" ||
+      upper === "CURRENT MEDICATIONS"
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  if (Array.isArray(value)) {
+    const list = value
+      .map((item) => (typeof item === "string" ? normalize(item) : ""))
+      .filter((item) => isLikelyContent(item));
+    return list.length > 0 ? [...new Set(list)] : [];
+  }
+
+  if (typeof value === "string") {
+    const cleaned = normalize(value);
+    if (!cleaned) return [];
+    const list = cleaned
+      .split(/[;,|]/g)
+      .map((item) => normalize(item))
+      .filter((item) => isLikelyContent(item));
+    return list.length > 0 ? [...new Set(list)] : [];
+  }
+
+  return null;
+}
+
+function sanitizeMedicineList(value: unknown): string[] | null {
+  const list = sanitizeStringList(value);
+  if (!list) return null;
+  const badTokens = new Set([
+    "hypothyroidism",
+    "diabetes",
+    "hypertension",
+    "anaemia",
+    "anemia",
+    "deficiency",
+    "type",
+    "dm",
+    "new",
+    "indication",
+    "instructions",
+    "summary",
+    "review",
+    "risk",
+  ]);
+
+  const cleanCandidate = (input: string): string => {
+    const tokens = input
+      .replace(/[()]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(" ")
+      .filter(Boolean);
+    if (tokens.length === 0) return "";
+
+    let lastBad = -1;
+    tokens.forEach((token, index) => {
+      const lower = token.toLowerCase();
+      if (badTokens.has(lower)) lastBad = index;
+    });
+
+    const sliced = lastBad >= 0 ? tokens.slice(lastBad + 1) : tokens;
+    return sliced.join(" ").trim();
+  };
+
+  const filtered = list
+    .map(cleanCandidate)
+    .filter((item) => {
+      const lower = item.toLowerCase();
+      if (!item) return false;
+      if (lower.length < 3 || lower.length > 50) return false;
+      if (lower.includes("instructions") || lower.includes("indication")) return false;
+      if (!/^[a-zA-Z0-9 +./-]+$/.test(item)) return false;
+      return true;
+    });
+  return filtered.length > 0 ? [...new Set(filtered)] : [];
+}
+
+function sanitizeMaritalStatus(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const lower = normalized.toLowerCase();
+  if (["single", "married", "divorced", "widowed", "separated"].includes(lower)) {
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }
+  return normalized;
+}
+
+function sanitizeDateOfBirth(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  if (/^\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4}$/.test(normalized)) return normalized;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+  return normalized;
+}
+
+function sanitizeAbhaNumber(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const digits = normalized.replace(/[^\d]/g, "");
+  if (digits.length < 8) return null;
+  return normalized;
+}
+
 function extractSnapshotFromTextFallback(text: string): ExtractedSnapshot {
   const snapshot: ExtractedSnapshot = {};
   const bloodGroup = text.match(/\b(AB|A|B|O)[+-]/i)?.[0];
@@ -381,6 +683,63 @@ function extractSnapshotFromTextFallback(text: string): ExtractedSnapshot {
     if (list) snapshot.allergies = list;
   }
 
+  const dobMatch = text.match(/date of birth\s*[:\-]?\s*([0-9]{1,2}[-/][A-Za-z]{3}[-/][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i);
+  if (dobMatch?.[1]) {
+    const dob = sanitizeDateOfBirth(dobMatch[1]);
+    if (dob) snapshot.dateOfBirth = dob;
+  }
+
+  const maritalMatch = text.match(/marital status\s*[:\-]?\s*([A-Za-z]+)(?:\s{2,}|$)/i);
+  if (maritalMatch?.[1]) {
+    const maritalStatus = sanitizeMaritalStatus(maritalMatch[1]);
+    if (maritalStatus) snapshot.maritalStatus = maritalStatus;
+  }
+
+  const abhaMatch = text.match(/abha number\s*[:\-]?\s*([0-9\- ]{8,30})/i);
+  if (abhaMatch?.[1]) {
+    const abhaNumber = sanitizeAbhaNumber(abhaMatch[1]);
+    if (abhaNumber) snapshot.abhaNumber = abhaNumber;
+  }
+
+  const upper = text.toUpperCase();
+  const medicalHistoryIndex = upper.lastIndexOf("MEDICAL HISTORY");
+  const medicalHistorySlice = medicalHistoryIndex >= 0 ? text.slice(medicalHistoryIndex + "MEDICAL HISTORY".length) : "";
+  const medicalHistoryBlock =
+    medicalHistorySlice.match(/([\s\S]{0,900}?)(?:VITALS|BLOOD SUGAR|CURRENT MEDICATIONS|CLINICAL SUMMARY|$)/i)?.[1] ??
+    "";
+  if (medicalHistoryBlock) {
+    const entries = sanitizeStringList(
+      medicalHistoryBlock
+      .split(/\s{2,}|\n|•/g)
+      .map((item) => item.replace(/\s+/g, " ").trim())
+      .filter((item) => item.length >= 4 && item.length <= 120),
+    ) ?? [];
+    if (entries.length > 0) {
+      const surgeryEntry = entries.find((item) => /surger|hospitali/i.test(item));
+      if (surgeryEntry) {
+        snapshot.surgeryHistory = surgeryEntry;
+      }
+      const pastHistory = entries.filter((item) => !/surger|hospitali/i.test(item));
+      if (pastHistory.length > 0) snapshot.pastMedicalHistory = [...new Set(pastHistory)];
+    }
+  }
+
+  const medicinesBlock =
+    text.match(/current medications\s*([\s\S]{0,1200}?)(?:clinical summary|allergy alert|next review|$)/i)?.[1] ??
+    "";
+  if (medicinesBlock) {
+    const medicineRegex = /([A-Z][A-Za-z0-9 +./-]{2,40})\s+\d[\d,]*(?:\.\d+)?\s*(?:mcg|mg|iu)\b/g;
+    const collected: string[] = [];
+    let medicineMatch: RegExpExecArray | null = medicineRegex.exec(medicinesBlock);
+    while (medicineMatch) {
+      const med = medicineMatch[1]?.replace(/\s+/g, " ").trim();
+      if (med) collected.push(med);
+      medicineMatch = medicineRegex.exec(medicinesBlock);
+    }
+    const medicines = sanitizeMedicineList(collected);
+    if (medicines && medicines.length > 0) snapshot.currentMedicines = medicines;
+  }
+
   return snapshot;
 }
 
@@ -399,7 +758,13 @@ Return STRICT JSON only with keys:
   "bloodGroup": string | null,
   "bp": string | null,
   "sugar": string | null,
-  "allergies": string[] | null
+  "allergies": string[] | null,
+  "dateOfBirth": string | null,
+  "maritalStatus": string | null,
+  "abhaNumber": string | null,
+  "pastMedicalHistory": string[] | null,
+  "surgeryHistory": string | null,
+  "currentMedicines": string[] | null
 }
 Rules:
 - bloodGroup must be one of A+, A-, B+, B-, O+, O-, AB+, AB-
@@ -425,9 +790,17 @@ ${text.slice(0, 12000)}`;
         bloodGroup: sanitizeBloodGroup(parsed.bloodGroup) ?? undefined,
         bp: asOptionalString(parsed.bp) ?? undefined,
         sugar: asOptionalString(parsed.sugar) ?? undefined,
+        dateOfBirth: sanitizeDateOfBirth(parsed.dateOfBirth) ?? undefined,
+        maritalStatus: sanitizeMaritalStatus(parsed.maritalStatus) ?? undefined,
+        abhaNumber: sanitizeAbhaNumber(parsed.abhaNumber) ?? undefined,
+        surgeryHistory: asOptionalString(parsed.surgeryHistory) ?? undefined,
       };
       const allergies = sanitizeAllergies(parsed.allergies);
       if (allergies) extracted.allergies = allergies;
+      const pastMedicalHistory = sanitizeStringList(parsed.pastMedicalHistory);
+      if (pastMedicalHistory) extracted.pastMedicalHistory = pastMedicalHistory;
+      const currentMedicines = sanitizeMedicineList(parsed.currentMedicines);
+      if (currentMedicines) extracted.currentMedicines = currentMedicines;
 
       return {
         age: extracted.age ?? fallback.age,
@@ -435,6 +808,12 @@ ${text.slice(0, 12000)}`;
         bp: extracted.bp ?? fallback.bp,
         sugar: extracted.sugar ?? fallback.sugar,
         allergies: extracted.allergies ?? fallback.allergies,
+        dateOfBirth: extracted.dateOfBirth ?? fallback.dateOfBirth,
+        maritalStatus: extracted.maritalStatus ?? fallback.maritalStatus,
+        abhaNumber: extracted.abhaNumber ?? fallback.abhaNumber,
+        pastMedicalHistory: extracted.pastMedicalHistory ?? fallback.pastMedicalHistory,
+        surgeryHistory: extracted.surgeryHistory ?? fallback.surgeryHistory,
+        currentMedicines: extracted.currentMedicines ?? fallback.currentMedicines,
       };
     } catch (error) {
       lastError = error;
@@ -468,7 +847,13 @@ Return STRICT JSON only with keys:
   "bloodGroup": string | null,
   "bp": string | null,
   "sugar": string | null,
-  "allergies": string[] | null
+  "allergies": string[] | null,
+  "dateOfBirth": string | null,
+  "maritalStatus": string | null,
+  "abhaNumber": string | null,
+  "pastMedicalHistory": string[] | null,
+  "surgeryHistory": string | null,
+  "currentMedicines": string[] | null
 }
 Rules:
 - bloodGroup must be one of A+, A-, B+, B-, O+, O-, AB+, AB-
@@ -502,9 +887,17 @@ Rules:
         bloodGroup: sanitizeBloodGroup(parsed.bloodGroup) ?? undefined,
         bp: asOptionalString(parsed.bp) ?? undefined,
         sugar: asOptionalString(parsed.sugar) ?? undefined,
+        dateOfBirth: sanitizeDateOfBirth(parsed.dateOfBirth) ?? undefined,
+        maritalStatus: sanitizeMaritalStatus(parsed.maritalStatus) ?? undefined,
+        abhaNumber: sanitizeAbhaNumber(parsed.abhaNumber) ?? undefined,
+        surgeryHistory: asOptionalString(parsed.surgeryHistory) ?? undefined,
       };
       const allergies = sanitizeAllergies(parsed.allergies);
       if (allergies) extracted.allergies = allergies;
+      const pastMedicalHistory = sanitizeStringList(parsed.pastMedicalHistory);
+      if (pastMedicalHistory) extracted.pastMedicalHistory = pastMedicalHistory;
+      const currentMedicines = sanitizeMedicineList(parsed.currentMedicines);
+      if (currentMedicines) extracted.currentMedicines = currentMedicines;
       return extracted;
     } catch (error) {
       lastError = error;
@@ -570,6 +963,12 @@ async function buildSnapshotFromLabResults(labResults: unknown): Promise<Extract
       bp: snapshot.bp ?? aiSnapshot.bp,
       sugar: snapshot.sugar ?? aiSnapshot.sugar,
       allergies: snapshot.allergies ?? aiSnapshot.allergies,
+      dateOfBirth: snapshot.dateOfBirth ?? aiSnapshot.dateOfBirth,
+      maritalStatus: snapshot.maritalStatus ?? aiSnapshot.maritalStatus,
+      abhaNumber: snapshot.abhaNumber ?? aiSnapshot.abhaNumber,
+      pastMedicalHistory: snapshot.pastMedicalHistory ?? aiSnapshot.pastMedicalHistory,
+      surgeryHistory: snapshot.surgeryHistory ?? aiSnapshot.surgeryHistory,
+      currentMedicines: snapshot.currentMedicines ?? aiSnapshot.currentMedicines,
     };
   }
 
@@ -589,6 +988,12 @@ async function buildSnapshotFromLabResults(labResults: unknown): Promise<Extract
         bp: snapshot.bp ?? aiSnapshot.bp,
         sugar: snapshot.sugar ?? aiSnapshot.sugar,
         allergies: snapshot.allergies ?? aiSnapshot.allergies,
+        dateOfBirth: snapshot.dateOfBirth ?? aiSnapshot.dateOfBirth,
+        maritalStatus: snapshot.maritalStatus ?? aiSnapshot.maritalStatus,
+        abhaNumber: snapshot.abhaNumber ?? aiSnapshot.abhaNumber,
+        pastMedicalHistory: snapshot.pastMedicalHistory ?? aiSnapshot.pastMedicalHistory,
+        surgeryHistory: snapshot.surgeryHistory ?? aiSnapshot.surgeryHistory,
+        currentMedicines: snapshot.currentMedicines ?? aiSnapshot.currentMedicines,
       };
     }
   }
@@ -609,6 +1014,46 @@ function applySnapshotToPatient(patient: PatientRow, snapshot: ExtractedSnapshot
   if (snapshot.allergies) {
     patient.allergies =
       sanitizeAllergies([...(patient.allergies ?? []), ...snapshot.allergies]) ?? [];
+  }
+
+  const dateOfBirth = sanitizeDateOfBirth(snapshot.dateOfBirth);
+  if (dateOfBirth) {
+    patient.dateOfBirth = dateOfBirth;
+  }
+
+  const maritalStatus = sanitizeMaritalStatus(snapshot.maritalStatus);
+  if (maritalStatus) {
+    patient.maritalStatus = maritalStatus;
+  }
+
+  const abhaNumber = sanitizeAbhaNumber(snapshot.abhaNumber);
+  if (abhaNumber) {
+    patient.abhaNumber = abhaNumber;
+  }
+
+  const pastMedicalHistory = sanitizeStringList(snapshot.pastMedicalHistory);
+  if (pastMedicalHistory && pastMedicalHistory.length > 0) {
+    patient.pastMedicalHistory = sanitizeStringList([
+      ...(patient.pastMedicalHistory ?? []),
+      ...pastMedicalHistory,
+    ]) ?? [];
+    patient.diseases = sanitizeStringList([
+      ...(patient.diseases ?? []),
+      ...pastMedicalHistory,
+    ]) ?? [];
+  }
+
+  const surgeryHistory = asOptionalString(snapshot.surgeryHistory);
+  if (surgeryHistory) {
+    patient.surgeryHistory = surgeryHistory;
+  }
+
+  const currentMedicines = sanitizeMedicineList(snapshot.currentMedicines);
+  if (currentMedicines && currentMedicines.length > 0) {
+    patient.currentMedicines = sanitizeMedicineList([
+      ...(patient.currentMedicines ?? []),
+      ...currentMedicines,
+    ]) ?? [];
   }
 }
 
@@ -1011,6 +1456,9 @@ function getPatientSummary(patient: PatientRow): {
   age: number | null;
   gender: string | null;
   bloodGroup: string | null;
+  dateOfBirth: string | null;
+  maritalStatus: string | null;
+  abhaNumber: string | null;
   bp: string | null;
   sugar: string | null;
   allergies: string[] | null;
@@ -1018,6 +1466,12 @@ function getPatientSummary(patient: PatientRow): {
   emergencyContact: string | null;
   pastDiseases: string[] | null;
 } {
+  const patientCurrentMedicines = Array.isArray(patient.currentMedicines)
+    ? patient.currentMedicines
+    : [];
+  const patientPastMedicalHistory = Array.isArray(patient.pastMedicalHistory)
+    ? patient.pastMedicalHistory
+    : [];
   const vitals = extractLatestVitals(patient.id);
   const medicines = extractCurrentMedicines(patient.id);
   return {
@@ -1026,12 +1480,25 @@ function getPatientSummary(patient: PatientRow): {
     age: Number.isFinite(patient.age) && patient.age > 0 ? patient.age : null,
     gender: patient.gender && patient.gender !== "Unknown" ? patient.gender : null,
     bloodGroup: patient.bloodGroup && patient.bloodGroup !== "Unknown" ? patient.bloodGroup : null,
+    dateOfBirth: patient.dateOfBirth ?? null,
+    maritalStatus: patient.maritalStatus ?? null,
+    abhaNumber: patient.abhaNumber ?? null,
     bp: vitals.bp,
     sugar: vitals.sugar,
     allergies: patient.allergies.length > 0 ? patient.allergies : null,
-    currentMedicines: medicines.length > 0 ? medicines : null,
+    currentMedicines:
+      patientCurrentMedicines.length > 0
+        ? patientCurrentMedicines
+        : medicines.length > 0
+          ? medicines
+          : null,
     emergencyContact: patient.emergencyContact ?? null,
-    pastDiseases: patient.diseases.length > 0 ? patient.diseases : null,
+    pastDiseases:
+      patientPastMedicalHistory.length > 0
+        ? patientPastMedicalHistory
+        : patient.diseases.length > 0
+          ? patient.diseases
+          : null,
   };
 }
 
@@ -1078,6 +1545,12 @@ router.post("/patients/register", async (req, res): Promise<void> => {
     bloodGroup,
     allergies: allergies ?? [],
     diseases: diseases ?? [],
+    dateOfBirth: null,
+    maritalStatus: null,
+    abhaNumber: null,
+    pastMedicalHistory: [],
+    surgeryHistory: null,
+    currentMedicines: [],
     emergencyContact: emergencyContact ?? null,
     createdAt: new Date(),
   };
@@ -1137,6 +1610,12 @@ router.post("/patients/:patientId/profile", async (req, res): Promise<void> => {
     age?: number | string;
     gender?: string;
     bloodGroup?: string;
+    dateOfBirth?: string;
+    maritalStatus?: string;
+    abhaNumber?: string;
+    pastMedicalHistory?: string[] | string;
+    surgeryHistory?: string;
+    currentMedicines?: string[] | string;
   };
 
   const maybeAge = typeof body.age === "number" ? body.age : Number(body.age);
@@ -1156,6 +1635,34 @@ router.post("/patients/:patientId/profile", async (req, res): Promise<void> => {
     if (bloodGroup && bloodGroup.toLowerCase() !== "unknown") {
       patient.bloodGroup = bloodGroup;
     }
+  }
+
+  const dateOfBirth = sanitizeDateOfBirth(body.dateOfBirth);
+  if (dateOfBirth) patient.dateOfBirth = dateOfBirth;
+
+  const maritalStatus = sanitizeMaritalStatus(body.maritalStatus);
+  if (maritalStatus) patient.maritalStatus = maritalStatus;
+
+  const abhaNumber = sanitizeAbhaNumber(body.abhaNumber);
+  if (abhaNumber) patient.abhaNumber = abhaNumber;
+
+  const pastMedicalHistory = sanitizeStringList(body.pastMedicalHistory);
+  if (pastMedicalHistory && pastMedicalHistory.length > 0) {
+    patient.pastMedicalHistory = sanitizeStringList([
+      ...(patient.pastMedicalHistory ?? []),
+      ...pastMedicalHistory,
+    ]) ?? [];
+  }
+
+  const surgeryHistory = asOptionalString(body.surgeryHistory);
+  if (surgeryHistory) patient.surgeryHistory = surgeryHistory;
+
+  const currentMedicines = sanitizeMedicineList(body.currentMedicines);
+  if (currentMedicines && currentMedicines.length > 0) {
+    patient.currentMedicines = sanitizeMedicineList([
+      ...(patient.currentMedicines ?? []),
+      ...currentMedicines,
+    ]) ?? [];
   }
 
   saveStore();
@@ -1964,6 +2471,8 @@ ${content}`;
 router.post("/chatbot", async (req, res): Promise<void> => {
   const parsed = req.body as { query?: string; patientId?: string | null };
   const query = (parsed.query ?? "").trim();
+  let selectedPatient: PatientRow | null = null;
+  let selectedRecords: MedicalRecordRow[] = [];
 
   if (!query) {
     res.json({ response: "Please ask me something about patient health records.", matchedField: null });
@@ -1980,12 +2489,27 @@ router.post("/chatbot", async (req, res): Promise<void> => {
           const records = MEDICAL_RECORDS.filter(
             (record) => record.patientId === parsed.patientId,
           );
+          selectedPatient = p;
+          selectedRecords = records;
           const allergies = (p.allergies ?? []).join(", ") || "None recorded";
           const diseases = (p.diseases ?? []).join(", ") || "None recorded";
           const allPrescriptions = records.flatMap((r) => r.prescriptions ?? []);
           const prescriptions = allPrescriptions.join(", ") || "None recorded";
           const doctors = [...new Set(records.map((r) => r.doctorName).filter(Boolean))].join(", ") || "None recorded";
           const hospitals = [...new Set(records.map((r) => r.hospitalName).filter(Boolean))].join(", ") || "None recorded";
+
+          const recordsWithExtractedContext = records
+            .map((r) => {
+              const extractedText = extractRecordTextForSearch(r)
+                .replace(/\s+/g, " ")
+                .trim()
+                .slice(0, 1800);
+              const extractedSection = extractedText
+                ? `\n    Extracted Record Text: ${extractedText}`
+                : "";
+              return `  - [${r.recordType}] ${r.title} - ${r.description ?? "No description"} (Date: ${r.visitDate ?? "Unknown"}, Doctor: ${r.doctorName ?? "Unknown"}, Hospital: ${r.hospitalName ?? "Unknown"})${extractedSection}`;
+            })
+            .join("\n");
 
           patientContext = `
 PATIENT PROFILE:
@@ -1995,10 +2519,12 @@ PATIENT PROFILE:
 - Blood Group: ${p.bloodGroup}
 - Allergies: ${allergies}
 - Medical Conditions: ${diseases}
+- Current Medicines: ${(p.currentMedicines ?? []).join(", ") || "None recorded"}
+- Past Medical History: ${(p.pastMedicalHistory ?? []).join(", ") || "None recorded"}
 - Emergency Contact: ${p.emergencyContact ?? "Not provided"}
 
 MEDICAL RECORDS (${records.length} total):
-${records.map((r) => `  - [${r.recordType}] ${r.title} - ${r.description ?? "No description"} (Date: ${r.visitDate ?? "Unknown"}, Doctor: ${r.doctorName ?? "Unknown"}, Hospital: ${r.hospitalName ?? "Unknown"})`).join("\n") || "  No records uploaded yet."}
+${recordsWithExtractedContext || "  No records uploaded yet."}
 
 PRESCRIPTIONS: ${prescriptions}
 TREATING DOCTORS: ${doctors}
@@ -2012,7 +2538,10 @@ HOSPITALS VISITED: ${hospitals}
 
     if (!ai) {
       res.json({
-        response: `${buildFallbackChatResponse(query)} (Gemini key not configured.)`,
+        response: `${buildFallbackChatResponse(query, {
+          patient: selectedPatient,
+          records: selectedRecords,
+        })} (Gemini key not configured.)`,
         matchedField: null,
       });
       return;
@@ -2030,6 +2559,8 @@ Guidelines:
 - Keep responses brief (2-4 sentences ideally) unless detail is needed
 - Use plain language that patients can understand
 - If asked about emergency situations, always advise to call emergency services first${patientContext ? `
+- If patient data is provided, do not ask the user to select a patient again; answer only from the provided patient context and records
+- If data for the question is not found in records, clearly say it is not found in current records
 
 You have access to the following patient data:
 ${patientContext}` : `
@@ -2077,7 +2608,10 @@ No specific patient is selected. Answer the question generally.`}`;
   } catch (err) {
     console.error("Gemini chatbot error:", err);
     res.json({
-      response: buildFallbackChatResponse(query),
+      response: buildFallbackChatResponse(query, {
+        patient: selectedPatient,
+        records: selectedRecords,
+      }),
       matchedField: null,
     });
   }

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import LanguageSelector from "@/components/LanguageSelector";
 
 const doctorNavLinks = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -144,14 +145,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="flex-1" />
-          {role && (
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <LanguageSelector />
+            {role && (
               <span className="inline-flex items-center gap-1 text-xs text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded-full">
                 <ShieldCheck className="w-3 h-3" />
                 {name}
               </span>
-            </div>
-          )}
+            )}
+          </div>
         </header>
 
         <main className="p-4 md:p-6 lg:p-8">

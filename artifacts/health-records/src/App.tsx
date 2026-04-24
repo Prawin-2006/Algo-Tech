@@ -17,6 +17,7 @@ import AuthPage from "@/pages/AuthPage";
 import ViewRecord from "@/pages/ViewRecord";
 import PatientRequests from "@/pages/PatientRequests";
 import Layout from "@/components/Layout";
+import { AppLanguageProvider } from "@/i18n/AppLanguageProvider";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,14 +53,16 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Layout>
-            <Router />
-          </Layout>
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
+      <AppLanguageProvider>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Layout>
+              <Router />
+            </Layout>
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </AppLanguageProvider>
     </QueryClientProvider>
   );
 }

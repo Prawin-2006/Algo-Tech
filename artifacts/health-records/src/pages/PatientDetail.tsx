@@ -14,6 +14,12 @@ type LocalPatientCredential = {
   age?: number;
   gender?: string;
   bloodGroup?: string;
+  dateOfBirth?: string;
+  maritalStatus?: string;
+  abhaNumber?: string;
+  pastMedicalHistory?: string[];
+  surgeryHistory?: string;
+  currentMedicines?: string[];
 };
 
 function getLocalPatientById(id: string): LocalPatientCredential | null {
@@ -63,6 +69,13 @@ function chooseAge(...values: Array<number | null | undefined>): number | undefi
     if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
   }
   return undefined;
+}
+
+function normalizeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
 }
 
 function formatBytes(size: number): string {
@@ -145,6 +158,7 @@ export default function PatientDetail() {
   });
 
   const localPatient = requestedPatientId ? getLocalPatientById(requestedPatientId) : null;
+  const patientDynamic = patient as Record<string, unknown> | undefined;
   const localByName = patient
     ? getAllLocalPatients().find(
         (entry) => entry.name.trim().toLowerCase() === patient.name.trim().toLowerCase(),
@@ -161,6 +175,38 @@ export default function PatientDetail() {
           localProfile?.bloodGroup,
           patientBloodGroup,
         ) ?? "Unknown",
+        dateOfBirth:
+          chooseKnownText(
+            typeof patientDynamic?.dateOfBirth === "string" ? patientDynamic.dateOfBirth : null,
+            localProfile?.dateOfBirth,
+          ) ?? null,
+        maritalStatus:
+          chooseKnownText(
+            typeof patientDynamic?.maritalStatus === "string" ? patientDynamic.maritalStatus : null,
+            localProfile?.maritalStatus,
+          ) ?? null,
+        abhaNumber:
+          chooseKnownText(
+            typeof patientDynamic?.abhaNumber === "string" ? patientDynamic.abhaNumber : null,
+            localProfile?.abhaNumber,
+          ) ?? null,
+        pastMedicalHistory: (() => {
+          const fromApi = normalizeStringList(patientDynamic?.pastMedicalHistory);
+          if (fromApi.length > 0) return fromApi;
+          const fromLocal = normalizeStringList(localProfile?.pastMedicalHistory);
+          if (fromLocal.length > 0) return fromLocal;
+          return patient.diseases ?? [];
+        })(),
+        surgeryHistory:
+          chooseKnownText(
+            typeof patientDynamic?.surgeryHistory === "string" ? patientDynamic.surgeryHistory : null,
+            localProfile?.surgeryHistory,
+          ) ?? null,
+        currentMedicines: (() => {
+          const fromApi = normalizeStringList(patientDynamic?.currentMedicines);
+          if (fromApi.length > 0) return fromApi;
+          return normalizeStringList(localProfile?.currentMedicines);
+        })(),
       }
     : role === "patient" && loggedInPatientId === requestedPatientId && localPatient
       ? {
@@ -173,6 +219,12 @@ export default function PatientDetail() {
           email: null,
           allergies: [] as string[],
           diseases: [] as string[],
+          dateOfBirth: localPatient.dateOfBirth ?? null,
+          maritalStatus: localPatient.maritalStatus ?? null,
+          abhaNumber: localPatient.abhaNumber ?? null,
+          pastMedicalHistory: normalizeStringList(localPatient.pastMedicalHistory),
+          surgeryHistory: localPatient.surgeryHistory ?? null,
+          currentMedicines: normalizeStringList(localPatient.currentMedicines),
           emergencyContact: null,
           createdAt: new Date().toISOString(),
         }
@@ -187,6 +239,12 @@ export default function PatientDetail() {
             email: null,
             allergies: [] as string[],
             diseases: [] as string[],
+            dateOfBirth: null,
+            maritalStatus: null,
+            abhaNumber: null,
+            pastMedicalHistory: [] as string[],
+            surgeryHistory: null,
+            currentMedicines: [] as string[],
             emergencyContact: null,
             createdAt: new Date().toISOString(),
           }
@@ -336,6 +394,9 @@ export default function PatientDetail() {
                 { label: "Blood Group", value: patientView.bloodGroup },
                 { label: "Age", value: `${patientView.age} years` },
                 { label: "Gender", value: patientView.gender },
+                { label: "Date of Birth", value: patientView.dateOfBirth ?? "N/A" },
+                { label: "Marital Status", value: patientView.maritalStatus ?? "N/A" },
+                { label: "ABHA Number", value: patientView.abhaNumber ?? "N/A" },
                 { label: "Phone", value: patientView.phone ?? "N/A" },
                 { label: "Email", value: patientView.email ?? "N/A" },
                 { label: "Emergency Contact", value: patientView.emergencyContact ?? "N/A" },
@@ -367,6 +428,39 @@ export default function PatientDetail() {
                   {patientView.diseases.map((d, i) => (
                     <span key={i} className="px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs border border-amber-200">
                       {d}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {patientView.pastMedicalHistory.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs text-muted-foreground mb-2">Past Medical History</p>
+                <div className="flex flex-wrap gap-2">
+                  {patientView.pastMedicalHistory.map((history, i) => (
+                    <span key={`${history}-${i}`} className="px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs border border-amber-200">
+                      {history}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {patientView.surgeryHistory && (
+              <div className="mt-4">
+                <p className="text-xs text-muted-foreground mb-1">Surgery / Hospitalisation History</p>
+                <p className="text-sm text-foreground">{patientView.surgeryHistory}</p>
+              </div>
+            )}
+
+            {patientView.currentMedicines.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs text-muted-foreground mb-2">Current Medicines</p>
+                <div className="flex flex-wrap gap-2">
+                  {patientView.currentMedicines.map((medicine, i) => (
+                    <span key={`${medicine}-${i}`} className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs border border-primary/20">
+                      {medicine}
                     </span>
                   ))}
                 </div>
